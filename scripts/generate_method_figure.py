@@ -232,10 +232,10 @@ def main():
             fontsize=10, fontweight="bold", color="#0F172A")
 
     # Arrows
-    draw_arrow(ax, 2.45, 2.15, x_s1 - 0.05, 2.15, color="#334155")
-    draw_arrow(ax, x_s1 + s_size + 0.05, y_mid, x_s2 - 0.05, y_mid, color="#0284C7")
-    draw_arrow(ax, x_s2 + s_size + 0.05, y_mid, x_s3 - 0.05, y_mid, color="#475569")
-    draw_arrow(ax, x_s3 + s_size + 0.05, y_mid, x_s4 - 0.05, y_mid, color="#EA580C")
+    draw_arrow(ax, 2.45, 2.15, x_s1 - 0.05, 2.15, color="#000000")
+    draw_arrow(ax, x_s1 + s_size + 0.05, y_mid, x_s2 - 0.05, y_mid, color="#000000")
+    draw_arrow(ax, x_s2 + s_size + 0.05, y_mid, x_s3 - 0.05, y_mid, color="#000000")
+    draw_arrow(ax, x_s3 + s_size + 0.05, y_mid, x_s4 - 0.05, y_mid, color="#000000")
 
     # Focus -> Inferred Mask (clean bottom path)
     x_focus = 1.375
