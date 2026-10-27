@@ -1,8 +1,8 @@
-# Adaptive Foveated Diffusion
+# Semantic Foveated Diffusion
 
 A two-stage, text-guided mixed-resolution **image generation** pipeline built on [Foveated Diffusion](https://arxiv.org/abs/2603.23491) ([`bchao1/foveated_diffusion`](https://github.com/bchao1/foveated_diffusion)).
 
-Whereas standard Foveated Diffusion requires a **pre-specified** spatial resolution mask (such as a fixed circle or eye-tracker gaze point), **Adaptive Foveated Diffusion** automatically infers *where* to allocate high-resolution tokens based on a user-specified text description of the important image regions.
+Whereas standard Foveated Diffusion requires a **pre-specified** spatial resolution mask (such as a fixed circle or eye-tracker gaze point), **Semantic Foveated Diffusion** automatically infers *where* to allocate high-resolution tokens based on a user-specified text description of the important image regions.
 
 ---
 
@@ -10,9 +10,9 @@ Whereas standard Foveated Diffusion requires a **pre-specified** spatial resolut
 
 ### Inputs
 1. **Main Image Prompt:** Describes the full scene to generate (e.g., *"A medieval knight standing in a mossy forest holding a glowing runesword"*).
-2. **Focus Prompt:** Specifies which part(s) of the scene should receive high-resolution compute (e.g., *"the glowing runesword"*).
+2. **Focus Prompt:** Specifies which semantic part(s) of the scene should receive high-resolution compute (e.g., *"the glowing runesword"*).
 
-### Stage 1: Coarse Low-Resolution Generation & Mask Inference
+### Stage 1: Coarse Low-Resolution Generation & Semantic Mask Inference
 1. **Low-Resolution Draft Generation:**
    Generate a coarse low-resolution image (at half spatial resolution, which uses 4x fewer tokens than full high-resolution generation) conditioned on the main prompt.
 2. **Vision-Language Feature Matching:**

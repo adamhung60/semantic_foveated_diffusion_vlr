@@ -5,9 +5,9 @@
 
 \begin{document}
 
-\section{Proposed Method}
+\section{Proposed Method: Semantic Foveated Diffusion}
 
-We propose \textbf{Adaptive Foveated Diffusion}, a two-stage, text-guided mixed-resolution image generation pipeline built upon Foveated Diffusion~\cite{chao2026foveated}. Standard Foveated Diffusion accelerates Diffusion Transformers (DiTs) by retaining high-resolution (HR) latent tokens only inside a region of interest and compressing peripheral regions into fewer low-resolution (LR) tokens. However, it requires a spatial foveation mask to be specified \textit{a priori} (e.g., via eye tracking or a manual mask). Because the spatial layout of a generated image is unknown prior to synthesis, a user cannot directly request higher resolution on a specific semantic object without first knowing where that object will appear. Our method resolves this limitation by automatically inferring the foveation mask from a coarse low-resolution draft and selectively refining the target region in a mixed-resolution second stage.
+We propose \textbf{Semantic Foveated Diffusion}, a two-stage, text-guided mixed-resolution image generation pipeline built upon Foveated Diffusion~\cite{chao2026foveated}. Standard Foveated Diffusion accelerates Diffusion Transformers (DiTs) by retaining high-resolution (HR) latent tokens only inside a region of interest and compressing peripheral regions into fewer low-resolution (LR) tokens. However, it requires a spatial foveation mask to be specified \textit{a priori} (e.g., via eye tracking or a manual coordinate mask). Because the spatial layout of a generated image is unknown prior to synthesis, a user cannot directly request higher resolution on a specific semantic object without first knowing where that object will appear. Our method resolves this limitation by moving from \textit{spatial} foveation to \textit{semantic} foveation: we automatically infer the foveation mask from a coarse low-resolution draft using vision-language feature matching, and selectively refine the target region in a mixed-resolution second stage.
 
 \subsection{Problem Setup and Inputs}
 Our pipeline takes two text inputs from the user:
@@ -18,7 +18,7 @@ Our pipeline takes two text inputs from the user:
 
 Let $(H, W)$ denote the target full image resolution, which corresponds to an $h \times w$ grid of latent tokens of channel dimension $c$. With a spatial downsampling factor of $d = 2$ in the periphery, each $2 \times 2$ block of HR tokens can be represented by a single LR token, reducing the token count in peripheral regions by $4\times$.
 
-\subsection{Stage 1: Coarse Low-Resolution Generation and Mask Inference}
+\subsection{Stage 1: Coarse Low-Resolution Generation and Semantic Mask Inference}
 
 \paragraph{1. Low-Resolution Draft Generation.}
 Conditioned on the main prompt $P$, we first run the diffusion model on a uniform low-resolution token grid of size $\frac{h}{2} \times \frac{w}{2}$ (containing $4\times$ fewer tokens than full high-resolution generation). Denoising this compact sequence produces clean low-resolution latents $\hat{z}_0^{\text{low}} \in \mathbb{R}^{c \times (\frac{h}{2} \cdot \frac{w}{2})}$, which are decoded via the VAE decoder $D$ into a coarse RGB draft image $\hat{x}^{\text{low}} = D(\hat{z}_0^{\text{low}}) \in \mathbb{R}^{3 \times \frac{H}{2} \times \frac{W}{2}}$. Because self-attention scales quadratically with sequence length, this draft pass incurs only a small fraction of the compute cost of full-resolution synthesis while establishing the global scene layout.
