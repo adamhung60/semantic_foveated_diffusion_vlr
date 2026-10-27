@@ -107,20 +107,12 @@ def draw_grid_image(ax, x0, y0, size, n_blocks=4, mode="draft", zorder=3):
 
     elif mode == "mixed":
         coarse_img = make_scene_pixels(res=12, high_detail_center=False)
-        fine_img = make_scene_pixels(res=64, high_detail_center=True)
         ax.imshow(
             coarse_img,
             origin="lower",
             extent=[x0, x0 + size, y0, y0 + size],
             interpolation="nearest",
             zorder=zorder,
-        )
-        ax.imshow(
-            fine_img[16:48, 16:48],
-            origin="lower",
-            extent=[x0 + cell, x0 + 3 * cell, y0 + cell, y0 + 3 * cell],
-            interpolation="nearest",
-            zorder=zorder + 0.5,
         )
         for i in range(n_blocks + 1):
             ax.plot([x0 + i * cell, x0 + i * cell], [y0, y0 + size],
