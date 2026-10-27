@@ -119,17 +119,16 @@ def draw_grid_image(ax, x0, y0, size, n_blocks=4, mode="draft", zorder=3):
                     color="#FFFFFF", lw=1.6, zorder=zorder + 1)
             ax.plot([x0, x0 + size], [y0 + i * cell, y0 + i * cell],
                     color="#FFFFFF", lw=1.6, zorder=zorder + 1)
+        # Draw all high-res 4x4 grid lines inside the central 2x2 region in red
         sub = cell / 2.0
-        for (r, c) in focus_rc:
-            bx = x0 + c * cell
-            by = y0 + r * cell
-            ax.plot([bx + sub, bx + sub], [by, by + cell],
-                    color="#FCA5A5", lw=1.3, zorder=zorder + 1.5)
-            ax.plot([bx, bx + cell], [by + sub, by + sub],
-                    color="#FCA5A5", lw=1.3, zorder=zorder + 1.5)
+        for j in range(5):
+            ax.plot([x0 + cell + j * sub, x0 + cell + j * sub], [y0 + cell, y0 + 3 * cell],
+                    color="#DC2626", lw=1.6, zorder=zorder + 2)
+            ax.plot([x0 + cell, x0 + 3 * cell], [y0 + cell + j * sub, y0 + cell + j * sub],
+                    color="#DC2626", lw=1.6, zorder=zorder + 2)
         hr_box = patches.Rectangle(
             (x0 + cell, y0 + cell), 2 * cell, 2 * cell,
-            facecolor="none", edgecolor="#DC2626", linewidth=2.5, zorder=zorder + 2
+            facecolor="none", edgecolor="#DC2626", linewidth=2.4, zorder=zorder + 2.5
         )
         ax.add_patch(hr_box)
 
@@ -140,20 +139,30 @@ def draw_grid_image(ax, x0, y0, size, n_blocks=4, mode="draft", zorder=3):
             coarse_img,
             origin="lower",
             extent=[x0, x0 + size, y0, y0 + size],
-            interpolation="bilinear",
+            interpolation="nearest",
             zorder=zorder,
         )
         ax.imshow(
             fine_img[24:72, 24:72],
             origin="lower",
             extent=[x0 + cell, x0 + 3 * cell, y0 + cell, y0 + 3 * cell],
-            interpolation="bilinear",
+            interpolation="nearest",
             zorder=zorder + 0.5,
         )
+        for i in range(n_blocks + 1):
+            ax.plot([x0 + i * cell, x0 + i * cell], [y0, y0 + size],
+                    color="#FFFFFF", lw=1.6, zorder=zorder + 1)
+            ax.plot([x0, x0 + size], [y0 + i * cell, y0 + i * cell],
+                    color="#FFFFFF", lw=1.6, zorder=zorder + 1)
+        sub = cell / 2.0
+        for j in range(5):
+            ax.plot([x0 + cell + j * sub, x0 + cell + j * sub], [y0 + cell, y0 + 3 * cell],
+                    color="#DC2626", lw=1.6, zorder=zorder + 2)
+            ax.plot([x0 + cell, x0 + 3 * cell], [y0 + cell + j * sub, y0 + cell + j * sub],
+                    color="#DC2626", lw=1.6, zorder=zorder + 2)
         hr_box = patches.Rectangle(
             (x0 + cell, y0 + cell), 2 * cell, 2 * cell,
-            facecolor="none", edgecolor="#DC2626", linewidth=2.0,
-            linestyle="--", zorder=zorder + 2
+            facecolor="none", edgecolor="#DC2626", linewidth=2.4, zorder=zorder + 2.5
         )
         ax.add_patch(hr_box)
 
