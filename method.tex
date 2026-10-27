@@ -12,8 +12,8 @@ We propose \textbf{Semantic Foveated Diffusion}, a two-stage, text-guided mixed-
 \subsection{Problem Setup and Inputs}
 Our pipeline takes two text inputs from the user:
 \begin{enumerate}
-    \item \textbf{Main Scene Prompt ($P$):} A natural language description of the overall scene to synthesize (e.g., \textit{``A medieval knight standing in a mossy forest holding a glowing runesword''}).
-    \item \textbf{Focus Prompt ($P_{\text{focus}}$):} A text specification of the semantic region(s) or object(s) where additional resolution and compute should be allocated (e.g., \textit{``the glowing runesword''}).
+    \item \textbf{Main Scene Prompt ($P$):} A natural language description of the overall scene to synthesize (e.g., \textit{``A little dog standing on a green lawn''}).
+    \item \textbf{Focus Prompt ($P_{\text{focus}}$):} A text specification of the semantic region(s) or object(s) where additional resolution and compute should be allocated (e.g., \textit{``the dog''}).
 \end{enumerate}
 
 Let $(H, W)$ denote the target full image resolution, which corresponds to an $h \times w$ grid of latent tokens of channel dimension $c$. With a spatial downsampling factor of $d = 2$ in the periphery, each $2 \times 2$ block of HR tokens can be represented by a single LR token, reducing the token count in peripheral regions by $4\times$.

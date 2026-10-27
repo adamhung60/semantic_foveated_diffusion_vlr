@@ -9,8 +9,8 @@ Whereas standard Foveated Diffusion requires a **pre-specified** spatial resolut
 ## Method & Pipeline Overview
 
 ### Inputs
-1. **Main Image Prompt:** Describes the full scene to generate (e.g., *"A medieval knight standing in a mossy forest holding a glowing runesword"*).
-2. **Focus Prompt:** Specifies which semantic part(s) of the scene should receive high-resolution compute (e.g., *"the glowing runesword"*).
+1. **Main Image Prompt:** Describes the full scene to generate (e.g., *"A little dog standing on a green lawn"*).
+2. **Focus Prompt:** Specifies which semantic part(s) of the scene should receive high-resolution compute (e.g., *"the dog"*).
 
 ### Stage 1: Coarse Low-Resolution Generation & Semantic Mask Inference
 1. **Low-Resolution Draft Generation:**
