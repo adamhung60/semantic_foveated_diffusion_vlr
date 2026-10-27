@@ -1,0 +1,66 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+
+\begin{document}
+
+\section{Proposed Method}
+
+We propose \textbf{Adaptive Foveated Diffusion}, a two-stage, text-guided mixed-resolution image generation pipeline built upon Foveated Diffusion~\cite{chao2026foveated}. Standard Foveated Diffusion accelerates Diffusion Transformers (DiTs) by retaining high-resolution (HR) latent tokens only inside a region of interest and compressing peripheral regions into fewer low-resolution (LR) tokens. However, it requires a spatial foveation mask to be specified \textit{a priori} (e.g., via eye tracking or a manual mask). Because the spatial layout of a generated image is unknown prior to synthesis, a user cannot directly request higher resolution on a specific semantic object without first knowing where that object will appear. Our method resolves this limitation by automatically inferring the foveation mask from a coarse low-resolution draft and selectively refining the target region in a mixed-resolution second stage.
+
+\subsection{Problem Setup and Inputs}
+Our pipeline takes two text inputs from the user:
+\begin{enumerate}
+    \item \textbf{Main Scene Prompt ($P$):} A natural language description of the overall scene to synthesize (e.g., \textit{``A medieval knight standing in a mossy forest holding a glowing runesword''}).
+    \item \textbf{Focus Prompt ($P_{\text{focus}}$):} A text specification of the semantic region(s) or object(s) where additional resolution and compute should be allocated (e.g., \textit{``the glowing runesword''}).
+\end{enumerate}
+
+Let $(H, W)$ denote the target full image resolution, which corresponds to an $h \times w$ grid of latent tokens of channel dimension $c$. With a spatial downsampling factor of $d = 2$ in the periphery, each $2 \times 2$ block of HR tokens can be represented by a single LR token, reducing the token count in peripheral regions by $4\times$.
+
+\subsection{Stage 1: Coarse Low-Resolution Generation and Mask Inference}
+
+\paragraph{1. Low-Resolution Draft Generation.}
+Conditioned on the main prompt $P$, we first run the diffusion model on a uniform low-resolution token grid of size $\frac{h}{2} \times \frac{w}{2}$ (containing $4\times$ fewer tokens than full high-resolution generation). Denoising this compact sequence produces clean low-resolution latents $\hat{z}_0^{\text{low}} \in \mathbb{R}^{c \times (\frac{h}{2} \cdot \frac{w}{2})}$, which are decoded via the VAE decoder $D$ into a coarse RGB draft image $\hat{x}^{\text{low}} = D(\hat{z}_0^{\text{low}}) \in \mathbb{R}^{3 \times \frac{H}{2} \times \frac{W}{2}}$. Because self-attention scales quadratically with sequence length, this draft pass incurs only a small fraction of the compute cost of full-resolution synthesis while establishing the global scene layout.
+
+\paragraph{2. Vision-Language Feature Matching.}
+To localize the user-specified region of interest within the coarse draft, we pass $\hat{x}^{\text{low}}$ and the focus prompt $P_{\text{focus}}$ through a lightweight pretrained open-vocabulary vision-language localizer (such as CLIPSeg or dense CLIP/SigLIP patch similarity). This produces a 2D spatial relevance heatmap $S \in [0, 1]^{\frac{h}{2} \times \frac{w}{2}}$ aligned with the low-resolution token grid, where higher values indicate stronger semantic correspondence with $P_{\text{focus}}$.
+
+\paragraph{3. Block-Aligned Foveation Mask Construction.}
+We convert the continuous relevance heatmap $S$ into a binary, block-aligned foveation mask $M \in \{0, 1\}^{h \times w}$ over the high-resolution token grid. Specifically, we select the top-$k\%$ highest-scoring blocks in $S$ (under a user- or system-defined token budget) or apply a similarity threshold, optionally followed by a 1-block morphological dilation so that object boundaries are not clipped. Each selected block in the $\frac{h}{2} \times \frac{w}{2}$ grid is expanded to a $2 \times 2$ block of ones in $M$ (indicating HR tokens, $M=1$), while remaining blocks are set to zero (indicating LR peripheral tokens, $M=0$).
+
+\subsection{Stage 2: Selective High-Resolution Re-Encoding and Mixed-Resolution Denoising}
+
+\paragraph{1. Selective Re-Encoding into Mixed-Resolution Tokens.}
+Rather than discarding the Stage~1 draft or naively duplicating LR latent tokens into $2 \times 2$ HR blocks---which introduces scale mismatches and correlated noise artifacts---we construct a cross-scale consistent latent representation:
+\begin{itemize}
+    \item For peripheral regions ($M = 0$), we directly retain the compact low-resolution latent tokens $\hat{z}_0^{\text{low}}$ from Stage~1 (1 token per $2 \times 2$ block).
+    \item For focus regions ($M = 1$), we spatially upsample the coarse draft image $\hat{x}^{\text{low}}$ to full resolution $(H, W)$, encode it with the VAE encoder $\hat{z}_0^{\text{high}} = E(\mathrm{Up}(\hat{x}^{\text{low}})) \in \mathbb{R}^{c \times (h \cdot w)}$, and extract all 4 HR tokens for each active $2 \times 2$ block in $M$.
+\end{itemize}
+Merging these two subsets yields a single variable-length mixed-resolution token sequence:
+\begin{equation}
+    \hat{z}_0^{\text{fov}} = \mathrm{Merge}(\hat{z}_0^{\text{high}}, \hat{z}_0^{\text{low}}, M) \in \mathbb{R}^{c \times L}, \qquad L = m + \frac{h \cdot w - m}{4},
+\end{equation}
+where $m = \|M\|_1$ is the number of HR tokens and $L \ll h \cdot w$.
+
+\paragraph{2. Partial Re-Noising and Mixed-Resolution Denoising.}
+While $\hat{z}_0^{\text{fov}}$ places high-resolution tokens over the target region, its underlying visual content only contains coarse frequencies from Stage~1. To synthesize sharp high-frequency details inside $M$ without losing the established global layout, we partially re-noise $\hat{z}_0^{\text{fov}}$ to an intermediate flow-matching timestep $t_{\text{switch}} \in (0, 1)$ using fresh Gaussian noise $z_1^{\text{fov}} \sim \mathcal{N}(0, I)$:
+\begin{equation}
+    z_{t_{\text{switch}}}^{\text{fov}} = (1 - t_{\text{switch}})\,\hat{z}_0^{\text{fov}} + t_{\text{switch}}\,z_1^{\text{fov}}.
+\end{equation}
+We then iteratively denoise $z_{t_{\text{switch}}}^{\text{fov}}$ from $t = t_{\text{switch}}$ down to $t = 0$ conditioned on $P$, utilizing Foveated Diffusion's Cross-Resolution Phase-Aligned (CRPA) Rotary Positional Embeddings (RoPE) and pretrained Foveated LoRA weights to produce the refined mixed-resolution latents $z_0^{\text{fov}}$.
+
+\paragraph{3. Decode and Blend.}
+Finally, we partition the clean mixed-resolution sequence $(z_0^{\text{high}}, z_0^{\text{low}}) = \mathrm{Split}(z_0^{\text{fov}}, M)$, decode both grids through the VAE decoder $D$, upsample the decoded LR image to $(H, W)$, and blend them in pixel space using a Gaussian-smoothed full-resolution mask $M' = \mathrm{Blur}(\mathrm{Up}(M)) \in [0, 1]^{H \times W}$:
+\begin{equation}
+    x_{\text{fov}} = M' \odot D(z_0^{\text{high}}) + (1 - M') \odot \mathrm{Up}\!\left(D(z_0^{\text{low}})\right).
+\end{equation}
+
+\begin{thebibliography}{1}
+\bibitem{chao2026foveated}
+Brian Chao, Lior Yariv, Howard Xiao, and Gordon Wetzstein.
+\newblock Foveated Diffusion: Efficient Spatially Adaptive Image and Video Generation.
+\newblock \emph{arXiv preprint arXiv:2603.23491}, 2026.
+\end{thebibliography}
+
+\end{document}
