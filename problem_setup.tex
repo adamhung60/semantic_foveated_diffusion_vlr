@@ -1,0 +1,21 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+\begin{document}
+
+\section{Problem Setup and Motivation}
+
+The cost of a diffusion transformer grows quadratically with the number of image tokens, yet standard generation spends the same compute on every region of the image. Foveated Diffusion~\cite{chao2026foveated} lowers this cost by keeping high-resolution tokens only inside a foveation mask and using low-resolution tokens elsewhere. The mask is fixed before generation starts, so the method never has to know where objects will appear. The model either generates the same content regardless of the mask, which suits gaze-contingent display, or is trained to move salient objects into the given mask. In both cases the mask decides where detail goes, and there is no way to say which content should get that detail.
+
+We study the setting where the user names the important content in text, such as \textit{``the dog''}, and the method decides where to place high-resolution tokens. The difficulty is that the location of this content is unknown until the image exists. The mask therefore has to be inferred during generation, and whatever it costs to infer counts toward the total compute.
+
+\paragraph{Hypothesis.}
+A low-resolution draft already fixes the scene layout, so a vision-language localizer applied to the draft should be able to find the target region. Refining the draft with the resulting mask should then match full-resolution quality inside the target region at a fraction of the compute. At the same token budget, it should also beat masks that ignore the text, such as a center circle or a saliency map.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
