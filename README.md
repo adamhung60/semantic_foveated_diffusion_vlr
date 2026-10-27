@@ -4,6 +4,8 @@ A two-stage, text-guided mixed-resolution **image generation** pipeline built on
 
 Whereas standard Foveated Diffusion requires a **pre-specified** spatial resolution mask (such as a fixed circle or eye-tracker gaze point), **Semantic Foveated Diffusion** automatically infers *where* to allocate high-resolution tokens based on a user-specified text description of the important image regions.
 
+![Semantic Foveated Diffusion Pipeline](assets/method_pipeline.png)
+
 ---
 
 ## Method & Pipeline Overview

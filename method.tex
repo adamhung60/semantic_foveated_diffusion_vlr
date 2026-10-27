@@ -1,11 +1,19 @@
 \documentclass[11pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb}
+\usepackage{graphicx}
 \usepackage{hyperref}
 
 \begin{document}
 
 \section{Proposed Method: Semantic Foveated Diffusion}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\textwidth]{assets/method_pipeline.pdf}
+    \caption{\textbf{Overview of Semantic Foveated Diffusion.} Given a scene prompt and a focus prompt, \textbf{Stage 1} generates a coarse low-resolution draft and uses vision-language feature matching to infer a binary mask over the target object. \textbf{Stage 2} selectively re-encodes the masked region into high-resolution tokens and performs mixed-resolution foveated denoising.}
+    \label{fig:method_pipeline}
+\end{figure}
 
 We propose \textbf{Semantic Foveated Diffusion}, a two-stage, text-guided mixed-resolution image generation pipeline built upon Foveated Diffusion~\cite{chao2026foveated}. Standard Foveated Diffusion accelerates Diffusion Transformers (DiTs) by retaining high-resolution (HR) latent tokens only inside a region of interest and compressing peripheral regions into fewer low-resolution (LR) tokens. However, it requires a spatial foveation mask to be specified \textit{a priori} (e.g., via eye tracking or a manual coordinate mask). Because the spatial layout of a generated image is unknown prior to synthesis, a user cannot directly request higher resolution on a specific semantic object without first knowing where that object will appear. Our method resolves this limitation by moving from \textit{spatial} foveation to \textit{semantic} foveation: we automatically infer the foveation mask from a coarse low-resolution draft using vision-language feature matching, and selectively refine the target region in a mixed-resolution second stage.
 
