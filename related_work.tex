@@ -1,0 +1,20 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+\begin{document}
+
+\section{Related Work}
+
+Diffusion models are becoming increasingly capable, but their computational cost remains a major challenge. In diffusion transformers, the cost of dense self-attention grows quadratically with the number of spatial tokens, making high-resolution image and video generation particularly expensive. This has motivated a range of research on making these architectures more computationally efficient. Existing approaches include the use of more efficient attention mechanisms \cite{choromanski2020rethinking}\cite{katharopoulos2020transformers}\cite{li2025radial}\cite{wang2020linformer}, hardware-aware optimizations \cite{dao2022flashattention}\cite{xi2025sparse}, and caching mechanisms that reuse intermediate computations across denoising steps . Another line of work \cite{bolya2023token}\cite{kim2024token}\cite{lee2025local} focuses on reducing the number of tokens processed during generation while preserving semantic content and visual quality. Mixed-resolution denoising methods \cite{jeong2026training}\cite{tian2025training} follow this direction by processing different spatial regions at different resolutions.
+
+These methods have demonstrated that computational resources can be allocated unevenly across an image while maintaining generation quality. An interesting direction is to allocate more computation to salient or semantically important regions and less to the background or other less important regions. \cite{kahatapitiya2024object} spends more sampling computation on salient foreground regions and reduces the cost of cross-frame attention by merging redundant background tokens. \cite{wu2025importance} uses importance scores to preserve information-rich tokens while merging less important ones. \cite{qin2026avits} combines latent–text attention with feature changes across denoising steps to prioritize important tokens for earlier upsampling, while refining the remaining tokens later. \cite{liu2026region} instead selectively updates regions receiving greater model focus and reuses cached noise predictions elsewhere.
+
+Mixed-resolution methods provide another way to achieve spatially adaptive computation. \cite{wu2026phase} enables stable attention between tokens at different resolutions. Its saliency-guided generation pipeline first establishes a coarse scene, then identifies salient regions and processes them at higher resolution while retaining lower resolution elsewhere. \cite{chao2026foveated} draws on human visual acuity, allocating higher token density near the specified foveal region and lower token density in the periphery. It takes a text prompt and a foveation mask as inputs and generates content using a mixed-resolution token sequence. \cite{nakayama2026level} extends spatially adaptive generation through variable-size rectangular patches, using level-of-detail information to allocate finer tokens where detail is needed and coarser tokens elsewhere. Together, these approaches demonstrate the potential of spatially adaptive token allocation for efficient image and video generation.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
