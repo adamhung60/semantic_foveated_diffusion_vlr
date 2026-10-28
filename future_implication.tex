@@ -1,0 +1,30 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+
+\begin{document}
+
+\section{Future Implications}
+
+Semantic Foveated Diffusion points toward generative systems that allocate computation according to user intent. Building on the mixed-resolution representation of Foveated Diffusion~\cite{chao2026foveated}, our proposed framework uses a focus prompt to determine which content should receive greater detail. This could allow users to prioritize a product, character, or other scene element without specifying its spatial location before generation. More broadly, semantic control over resolution could enable creative workflows in which available computation is directed toward the content most important to the user.
+
+A promising extension is to adapt this allocation throughout generation. AViTS~\cite{qin2026avits} explores adaptive token selection using latent--text attention and feature changes across denoising steps. Building on this direction, future versions of our framework could use the focus prompt to guide evolving resolution assignments as the scene develops. Combining semantic priorities with adaptive token selection could provide finer control over both where and when computational resources are allocated.
+
+The framework could also be extended to multiple focus prompts with different priorities, allowing users to distribute a fixed token budget across several objects. In an interactive workflow, users could inspect a coarse draft and revise these priorities to selectively refine the content they care about. Together, these directions suggest a broader role for natural language as an interface for controlling the distribution of detail and computation in image generation.
+
+\begin{thebibliography}{9}
+
+\bibitem{chao2026foveated}
+Brian Chao, Lior Yariv, Howard Xiao, and Gordon Wetzstein.
+\newblock Foveated Diffusion: Efficient Spatially Adaptive Image and Video Generation.
+\newblock \emph{arXiv preprint arXiv:2603.23491}, 2026.
+
+\bibitem{qin2026avits}
+Haoran Qin et al.
+\newblock AViTS: Adaptive Spatiotemporal Token Selection for Efficient Dynamic-Resolution Generation.
+\newblock \emph{European Conference on Computer Vision}, pp.~257--273, 2026.
+
+\end{thebibliography}
+
+\end{document}
+
