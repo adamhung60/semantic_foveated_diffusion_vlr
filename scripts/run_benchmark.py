@@ -18,7 +18,7 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.semantic_foveation.benchmark import BENCHMARK_PROMPTS
+from src.semantic_foveation.benchmark import BENCHMARK_PROMPTS, PROMPT_SETS
 from src.semantic_foveation.metrics import SemanticEvaluator, focus_box_from_heatmap
 from src.semantic_foveation.pipeline import SemanticFoveatedPipeline
 
@@ -27,7 +27,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--output_dir", type=str, default="/fast8tb/adam/semantic_foveated_diffusion_cache/eval_small_objects")
-    parser.add_argument("--results_csv", type=str, default="results/benchmark_metrics.csv")
+    parser.add_argument("--low_vram", action="store_true", help="Swap DiT to CPU during prompt encoding")
+    parser.add_argument("--prompt_set", type=str, default="small", choices=list(PROMPT_SETS))
+    parser.add_argument("--results_csv", type=str, default=None)
     parser.add_argument("--draft_factor", type=int, default=4)
     parser.add_argument("--stage1_steps", type=int, default=14)
     parser.add_argument("--stage2_steps", type=int, default=14)
@@ -37,11 +39,13 @@ def main():
     parser.add_argument("--dilation_blocks", type=int, default=2)
     parser.add_argument("--num_prompts", type=int, default=60)
     args = parser.parse_args()
+    if args.results_csv is None:
+        args.results_csv = "results/benchmark_metrics.csv" if args.prompt_set == "small" else f"results/{args.prompt_set}_subject_metrics.csv"
 
     os.makedirs(args.output_dir, exist_ok=True)
     os.makedirs(os.path.dirname(os.path.abspath(args.results_csv)), exist_ok=True)
 
-    pipe = SemanticFoveatedPipeline(device=args.device, offload_text_encoder=True)
+    pipe = SemanticFoveatedPipeline(device=args.device, offload_text_encoder=True, low_vram=args.low_vram)
     evaluator = SemanticEvaluator(device=args.device)
     for m in ["no_fov", "random"]:
         pipe._preload_lora_deltas(m)
@@ -62,7 +66,7 @@ def main():
         )
 
     records = []
-    for idx, item in enumerate(BENCHMARK_PROMPTS[: args.num_prompts]):
+    for idx, item in enumerate(PROMPT_SETS[args.prompt_set][: args.num_prompts]):
         pid, prompt, focus, seed = item["id"], item["prompt"], item["focus_prompt"], item["seed"]
         cached = pipe.encode_prompt_cached(prompt)
 

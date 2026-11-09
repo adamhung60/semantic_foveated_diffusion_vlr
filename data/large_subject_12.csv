@@ -1,0 +1,13 @@
+id,category,prompt,focus_prompt,seed
+100,large_subject,"A close-up portrait of an old fisherman with a weathered face and white beard, wearing a knitted wool hat, against a plain grey wall",an old fisherman,200
+101,large_subject,"A tabby cat sitting upright and looking at the camera, filling most of the frame, in front of a plain beige wall",a tabby cat,201
+102,large_subject,A vintage red motorcycle with chrome details parked in front of a plain white studio backdrop,a red motorcycle,202
+103,large_subject,"A colorful scarlet macaw perched on a branch in the foreground, against a clear pale blue sky",a scarlet macaw,203
+104,large_subject,"A large bowl of ramen with egg, pork and green onions on a plain wooden table, seen from a low angle",a bowl of ramen,204
+105,large_subject,"A golden retriever sitting on a plain grey studio floor with a plain grey background, looking at the camera",a golden retriever,205
+106,large_subject,"A close-up of a sunflower in full bloom filling the frame, against a plain overcast white sky",a sunflower,206
+107,large_subject,"A young woman with curly red hair and freckles, head and shoulders portrait, against a plain dark green background",a woman with curly red hair,207
+108,large_subject,"An antique brass telescope on a tripod in the foreground, against a plain dark navy wall",a brass telescope,208
+109,large_subject,"A large green chameleon on a branch filling most of the frame, against a plain smooth light grey background",a chameleon,209
+110,large_subject,"A vintage leather boot with laces standing on a plain white surface, against a plain white background",a leather boot,210
+111,large_subject,"A barn owl standing on a wooden post in the foreground, against a plain foggy grey background",a barn owl,211

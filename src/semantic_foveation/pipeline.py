@@ -109,8 +109,10 @@ class SemanticFoveatedPipeline:
         device: str = "cuda:0",
         torch_dtype: torch.dtype = torch.bfloat16,
         offload_text_encoder: bool = True,
+        low_vram: bool = False,
     ):
         self.device = device
+        self.low_vram = low_vram
         self.torch_dtype = torch_dtype
         self.model_id = model_id
         self.offload_text_encoder = offload_text_encoder
@@ -212,6 +214,10 @@ class SemanticFoveatedPipeline:
                 "Flux2FoveatedUnit_PromptEmbedder",
                 "Flux2FoveatedUnit_Qwen3PromptEmbedder",
             ):
+                if self.low_vram:
+                    # DiT and text encoder do not fit on the GPU together; swap them (prompt encoding is untimed)
+                    self.pipe.dit.to("cpu")
+                    torch.cuda.empty_cache()
                 if self.pipe.text_encoder_qwen3 is not None:
                     enc_dev = next(self.pipe.text_encoder_qwen3.parameters()).device
                     if enc_dev != torch.device(self.device):
@@ -220,9 +226,11 @@ class SemanticFoveatedPipeline:
                 if cfg_scale != 1.0:
                     inputs_nega = unit.process(self.pipe, prompt=negative_prompt)
 
-        if self.offload_text_encoder and self.pipe.text_encoder_qwen3 is not None:
+        if (self.offload_text_encoder or self.low_vram) and self.pipe.text_encoder_qwen3 is not None:
             self.pipe.text_encoder_qwen3.to("cpu")
             torch.cuda.empty_cache()
+        if self.low_vram:
+            self.pipe.dit.to(self.device)
 
         return inputs_posi, inputs_nega
 

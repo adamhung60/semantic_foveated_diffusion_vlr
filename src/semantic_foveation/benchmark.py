@@ -83,14 +83,38 @@ BENCHMARK_PROMPTS: List[Dict] = [
 ]
 
 
-def save_benchmark_csv(out_csv: str = "data/small_object_benchmark_60.csv") -> None:
+# Large foreground subject on a plain, uninteresting background.
+_LARGE_RAW = [
+    ("A close-up portrait of an old fisherman with a weathered face and white beard, wearing a knitted wool hat, against a plain grey wall", "an old fisherman"),
+    ("A tabby cat sitting upright and looking at the camera, filling most of the frame, in front of a plain beige wall", "a tabby cat"),
+    ("A vintage red motorcycle with chrome details parked in front of a plain white studio backdrop", "a red motorcycle"),
+    ("A colorful scarlet macaw perched on a branch in the foreground, against a clear pale blue sky", "a scarlet macaw"),
+    ("A large bowl of ramen with egg, pork and green onions on a plain wooden table, seen from a low angle", "a bowl of ramen"),
+    ("A golden retriever sitting on a plain grey studio floor with a plain grey background, looking at the camera", "a golden retriever"),
+    ("A close-up of a sunflower in full bloom filling the frame, against a plain overcast white sky", "a sunflower"),
+    ("A young woman with curly red hair and freckles, head and shoulders portrait, against a plain dark green background", "a woman with curly red hair"),
+    ("An antique brass telescope on a tripod in the foreground, against a plain dark navy wall", "a brass telescope"),
+    ("A large green chameleon on a branch filling most of the frame, against a plain smooth light grey background", "a chameleon"),
+    ("A vintage leather boot with laces standing on a plain white surface, against a plain white background", "a leather boot"),
+    ("A barn owl standing on a wooden post in the foreground, against a plain foggy grey background", "a barn owl"),
+]
+
+LARGE_SUBJECT_PROMPTS: List[Dict] = [
+    {"id": 100 + i, "category": "large_subject", "prompt": prompt, "focus_prompt": focus, "seed": 200 + i}
+    for i, (prompt, focus) in enumerate(_LARGE_RAW)
+]
+
+PROMPT_SETS = {"small": BENCHMARK_PROMPTS, "large": LARGE_SUBJECT_PROMPTS}
+
+
+def save_benchmark_csv(prompts: List[Dict], out_csv: str) -> None:
     os.makedirs(os.path.dirname(out_csv), exist_ok=True)
     with open(out_csv, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["id", "category", "prompt", "focus_prompt", "seed"])
         writer.writeheader()
-        writer.writerows(BENCHMARK_PROMPTS)
+        writer.writerows(prompts)
 
 
 if __name__ == "__main__":
-    save_benchmark_csv()
-    print(f"Saved {len(BENCHMARK_PROMPTS)} prompts")
+    save_benchmark_csv(BENCHMARK_PROMPTS, "data/small_object_benchmark_60.csv")
+    save_benchmark_csv(LARGE_SUBJECT_PROMPTS, "data/large_subject_12.csv")

@@ -28,7 +28,15 @@ def draw_mask_contour(img: np.ndarray, mask: np.ndarray, color=(0, 230, 255), wi
     return out
 
 
-def qualitative_figure(df: pd.DataFrame, ids, out_path: str):
+def detail_box(center, side: int, size: int = 1024):
+    cx, cy = center
+    x0 = int(np.clip(cx - side // 2, 0, size - side))
+    y0 = int(np.clip(cy - side // 2, 0, size - side))
+    return x0, y0, x0 + side, y0 + side
+
+
+def qualitative_figure(df: pd.DataFrame, ids, out_path: str, crop_side: int = None):
+    """crop_side: if set, zoom into a fixed-size detail crop at the subject center instead of the whole object."""
     fig, axes = plt.subplots(2 * len(ids), len(COLUMNS), figsize=(3.2 * len(COLUMNS), 3.2 * 2 * len(ids)))
     for r, pid in enumerate(ids):
         p_dir = os.path.join(EVAL_DIR, f"{pid:03d}")
@@ -36,6 +44,13 @@ def qualitative_figure(df: pd.DataFrame, ids, out_path: str):
         for c, (method, title) in enumerate(COLUMNS):
             img = np.asarray(Image.open(os.path.join(p_dir, f"{method}.png")).convert("RGB"))
             box = json.loads(df[(df.id == pid) & (df.method == method)].box.iloc[0])
+            if crop_side:
+                if method == "full_hr":
+                    center = ((box[0] + box[2]) // 2, (box[1] + box[3]) // 2)
+                else:
+                    ys, xs = np.nonzero(mask)
+                    center = (int(xs.mean()), int(ys.mean()))
+                box = detail_box(center, crop_side)
             full = draw_mask_contour(img, mask) if method == "ours" else img
             x0, y0, x1, y1 = box
             crop = cv2.resize(img[y0:y1, x0:x1], (512, 512), interpolation=cv2.INTER_LANCZOS4)
@@ -45,7 +60,7 @@ def qualitative_figure(df: pd.DataFrame, ids, out_path: str):
                 axes[0, c].set_title(title, fontsize=12)
         focus = df[df.id == pid].focus_prompt.iloc[0] if "focus_prompt" in df else ""
         axes[2 * r, 0].set_ylabel(f'"{focus}"', fontsize=10)
-        axes[2 * r + 1, 0].set_ylabel("focus crop", fontsize=10)
+        axes[2 * r + 1, 0].set_ylabel("detail crop" if crop_side else "focus crop", fontsize=10)
     for ax in axes.flat:
         ax.set_xticks([])
         ax.set_yticks([])
@@ -67,18 +82,20 @@ def contact_sheet(df: pd.DataFrame, out_path: str, tile: int = 160):
 
 
 if __name__ == "__main__":
-    from src.semantic_foveation.benchmark import BENCHMARK_PROMPTS
+    from src.semantic_foveation.benchmark import PROMPT_SETS
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--metrics_csv", default="results/benchmark_metrics.csv")
     parser.add_argument("--ids", type=int, nargs="+", default=[0, 15, 45])
     parser.add_argument("--contact_sheet", action="store_true")
+    parser.add_argument("--crop_side", type=int, default=None)
+    parser.add_argument("--out", default="assets/qualitative_comparison.png")
     args = parser.parse_args()
 
     df = pd.read_csv(args.metrics_csv)
-    focus = {p["id"]: p["focus_prompt"] for p in BENCHMARK_PROMPTS}
+    focus = {p["id"]: p["focus_prompt"] for ps in PROMPT_SETS.values() for p in ps}
     df["focus_prompt"] = df.id.map(focus)
     os.makedirs("assets", exist_ok=True)
     if args.contact_sheet:
         contact_sheet(df, os.path.join(EVAL_DIR, "contact_sheet.png"))
-    qualitative_figure(df, args.ids, "assets/qualitative_comparison.png")
+    qualitative_figure(df, args.ids, args.out, crop_side=args.crop_side)

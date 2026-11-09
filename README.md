@@ -19,7 +19,7 @@ Standard Foveated Diffusion needs a pre-specified resolution mask (a fixed circl
 
 ## Results
 
-The method is 3.4× faster than full 1024² generation end to end (3.7 s vs 12.6 s on an RTX 5090). The focus object is much sharper than the low-res draft, but full-resolution generation is still more detailed. See [**RESULTS.md**](RESULTS.md).
+The method is 3.4× faster than full 1024² generation end to end for small subjects (3.7 s vs 12.6 s on an RTX 5090), and about 2.3× faster for large foreground subjects on plain backgrounds. The focus object is much sharper than the low-res draft, but full-resolution generation is still more detailed. See [**RESULTS.md**](RESULTS.md).
 
 ## Repository structure
 
@@ -30,7 +30,7 @@ The method is 3.4× faster than full 1024² generation end to end (3.7 s vs 12.6
 │   └── semantic_foveation/
 │       ├── pipeline.py           # Stage 1 draft, Stage 2 foveated refinement, full-HR baseline
 │       ├── localizer.py          # CLIPSeg heatmap -> block-aligned foveation mask
-│       ├── benchmark.py          # 60-prompt small-object benchmark
+│       ├── benchmark.py          # Small-object (60) and large-subject (12) prompt sets
 │       └── metrics.py            # Focus-crop CLIP-IQA, HF energy, CLIP score
 ├── scripts/
 │   ├── infer_semantic_foveation.py   # Single-prompt inference
@@ -39,8 +39,8 @@ The method is 3.4× faster than full 1024² generation end to end (3.7 s vs 12.6
 │   ├── ablation_negative_prompt.py   # Negative prompt x t_switch ablation
 │   ├── generate_results_figures.py   # Qualitative figure
 │   └── generate_method_figure.py     # Method diagram
-├── data/small_object_benchmark_60.csv
-├── results/                          # benchmark_metrics.csv, timing.csv
+├── data/                             # small_object_benchmark_60.csv, large_subject_12.csv
+├── results/                          # per-prompt metrics and timing CSVs
 └── RESULTS.md
 ```
 
@@ -53,6 +53,9 @@ python scripts/infer_semantic_foveation.py \
   --output_dir outputs/demo_skier
 
 python scripts/run_benchmark.py --device cuda:0
+python scripts/run_benchmark.py --prompt_set large --t_switch 0.95 --device cuda:0
 python scripts/run_timing.py --device cuda:0
 python scripts/generate_results_figures.py --ids 31 15 47
+python scripts/generate_results_figures.py --metrics_csv results/large_subject_metrics.csv \
+  --ids 101 103 100 --crop_side 320 --out assets/large_subject_comparison.png
 ```
