@@ -2,32 +2,57 @@
 
 A two-stage, text-guided mixed-resolution **image generation** pipeline built on [Foveated Diffusion](https://arxiv.org/abs/2603.23491) ([`bchao1/foveated_diffusion`](https://github.com/bchao1/foveated_diffusion)).
 
-Whereas standard Foveated Diffusion requires a **pre-specified** spatial resolution mask (such as a fixed circle or eye-tracker gaze point), **Semantic Foveated Diffusion** automatically infers *where* to allocate high-resolution tokens based on a user-specified text description of the important image regions.
+Standard Foveated Diffusion needs a pre-specified resolution mask (a fixed circle or a gaze point). **Semantic Foveated Diffusion** infers *where* to spend high-resolution tokens from a cheap low-resolution draft and a text description of what matters.
 
 ![Semantic Foveated Diffusion Pipeline](assets/method_pipeline.png)
 
----
+## Method
 
-## Method & Pipeline Overview
+**Inputs:** a scene prompt (*"a wide snowy mountain landscape, a skier in a red jacket…"*) and a focus prompt (*"a skier in a red jacket"*).
 
-### Inputs
-1. **Main Image Prompt:** Describes the full scene to generate (e.g., *"A little dog standing on a green lawn"*).
-2. **Focus Prompt:** Specifies which semantic part(s) of the scene should receive high-resolution compute (e.g., *"the dog"*).
+1. **Stage 1 (draft):** generate a 256² draft (16×16 = 256 tokens, 14 steps) with FLUX.2-klein-base-4B.
+2. **Mask:** run CLIPSeg (`CIDAS/clipseg-rd64-refined`) on the draft and focus prompt. Threshold the heatmap at 0.5 and dilate by 2 blocks to get a block-aligned mask on the 32×32 token grid.
+3. **Stage 2 (foveated refinement):**
+   - VAE-encode the upsampled draft. Keep full-resolution tokens inside the mask and ½-resolution tokens outside: $L = m + (4096 - m)/4$ tokens.
+   - Re-noise to $t = 0.85$ and denoise in 14 steps with Foveated Diffusion's CRPA attention and pretrained `fov_random` LoRA.
+   - Decode both resolutions and blend with a smoothed mask.
 
-### Stage 1: Coarse Low-Resolution Generation & Semantic Mask Inference
-1. **Low-Resolution Draft Generation:**
-   Generate a coarse low-resolution image (at half spatial resolution, which uses 4x fewer tokens than full high-resolution generation) conditioned on the main prompt.
-2. **Vision-Language Feature Matching:**
-   Pass the coarse image and the focus prompt through a lightweight pretrained vision-language localizer (such as CLIPSeg or dense CLIP/SigLIP patch similarity) to produce a 2D spatial relevance heatmap over the image.
-3. **Block-Aligned Foveation Mask:**
-   Convert the heatmap into a binary foveation mask on the token-block grid (e.g., by selecting the top-scoring blocks or applying a similarity threshold, with optional padding so object edges are not clipped). This mask marks which regions should use high-resolution (HR) tokens and which peripheral regions can stay as low-resolution (LR) tokens.
+## Results
 
-### Stage 2: Selective High-Resolution Re-Encoding & Mixed-Resolution Denoising
-1. **Selective Re-Encoding into Mixed-Resolution Tokens:**
-   - Keep the peripheral regions outside the mask as compact low-resolution latent tokens (1 token per 2x2 block).
-   - Upsample the coarse image to full resolution, encode it with the VAE encoder, and retain all 4 high-resolution tokens per 2x2 block inside the inferred mask.
-   - Merge the high-resolution focus tokens and low-resolution peripheral tokens into a single compact, variable-length mixed-resolution token sequence.
-2. **Partial Re-Noising & Mixed-Resolution Denoising:**
-   Add an intermediate amount of noise to the merged token sequence (preserving the coarse global layout from Stage 1 while allowing sharp details to be generated inside the focus region), and denoise back to a clean latent sequence using Foveated Diffusion's mixed-resolution DiT and pretrained Foveated LoRA weights.
-3. **Decode & Blend:**
-   Split the denoised mixed-resolution tokens back into high-resolution and low-resolution grids, decode both with the VAE, and smoothly blend them using the inferred mask to produce the final full-resolution image.
+The method is 3.4× faster than full 1024² generation end to end (3.7 s vs 12.6 s on an RTX 5090). The focus object is much sharper than the low-res draft, but full-resolution generation is still more detailed. See [**RESULTS.md**](RESULTS.md).
+
+## Repository structure
+
+```text
+├── src/
+│   ├── diffsynth_fov/            # Foveated FLUX.2 DiT (CRPA attention) & pipeline (from upstream)
+│   ├── masks/                    # Geometric mask primitives (from upstream)
+│   └── semantic_foveation/
+│       ├── pipeline.py           # Stage 1 draft, Stage 2 foveated refinement, full-HR baseline
+│       ├── localizer.py          # CLIPSeg heatmap -> block-aligned foveation mask
+│       ├── benchmark.py          # 60-prompt small-object benchmark
+│       └── metrics.py            # Focus-crop CLIP-IQA, HF energy, CLIP score
+├── scripts/
+│   ├── infer_semantic_foveation.py   # Single-prompt inference
+│   ├── run_benchmark.py              # Quality benchmark (all methods, 60 prompts)
+│   ├── run_timing.py                 # Repeated latency measurement
+│   ├── ablation_negative_prompt.py   # Negative prompt x t_switch ablation
+│   ├── generate_results_figures.py   # Qualitative figure
+│   └── generate_method_figure.py     # Method diagram
+├── data/small_object_benchmark_60.csv
+├── results/                          # benchmark_metrics.csv, timing.csv
+└── RESULTS.md
+```
+
+## Quick start
+
+```bash
+python scripts/infer_semantic_foveation.py \
+  --prompt "A wide snowy mountain landscape, a skier in a red jacket descending the slope in the distance" \
+  --focus_prompt "a skier in a red jacket" \
+  --output_dir outputs/demo_skier
+
+python scripts/run_benchmark.py --device cuda:0
+python scripts/run_timing.py --device cuda:0
+python scripts/generate_results_figures.py --ids 31 15 47
+```

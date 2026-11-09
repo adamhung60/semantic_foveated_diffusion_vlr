@@ -1,0 +1,61 @@
+id,category,prompt,focus_prompt,seed
+0,animal,"A wide shot of a quiet city park with green lawns and trees, a red fox sitting on a wooden bench on the right side",a red fox,100
+1,animal,"A snowy pine forest clearing in winter, a small snowy owl perched on a fence post in the lower left",a snowy owl,101
+2,animal,"A vast golden wheat field under a blue sky, a hare standing upright in the middle distance",a hare,102
+3,animal,"A kitchen counter with pots, jars and a window, an orange tabby cat curled up on the windowsill",an orange tabby cat,103
+4,animal,"A misty river valley at dawn, a grey heron standing in the shallow water near the far bank",a grey heron,104
+5,animal,"A tropical beach with palm trees and turquoise water, a small sea turtle crawling on the sand in the foreground",a sea turtle,105
+6,animal,"A garden with rows of colorful tulips, a single monarch butterfly resting on a yellow tulip",a monarch butterfly,106
+7,animal,"A rocky mountain slope with scattered boulders, a mountain goat standing on a ledge near the top right",a mountain goat,107
+8,animal,"A cozy living room with a sofa, rug and bookshelves, a small beagle puppy sleeping on the rug",a beagle puppy,108
+9,animal,"An autumn forest floor covered in orange leaves, a red squirrel holding an acorn on a tree stump",a red squirrel,109
+10,animal,"A calm lake surrounded by reeds at sunset, a white swan floating on the water in the distance",a white swan,110
+11,animal,"A savanna with acacia trees and tall dry grass, a cheetah resting under a tree on the left",a cheetah,111
+12,animal,"A coral reef underwater scene with blue water, a small clownfish peeking out of a sea anemone",a clownfish,112
+13,animal,"A farmyard with a red barn and hay bales, a rooster standing on top of a wooden fence",a rooster,113
+14,animal,"A desert landscape with sand dunes and a clear sky, a small fennec fox on top of a dune",a fennec fox,114
+15,object,"A cluttered wooden desk seen from above, with papers, books and coffee mugs, and a gold pocket watch with an engraved face near the corner",a gold pocket watch,115
+16,object,"A sunny picnic blanket on grass with fruit and sandwiches, a glass bottle of lemonade standing on the edge",a glass bottle of lemonade,116
+17,object,"A messy workshop bench with tools and wood shavings, a small brass compass lying among the tools",a brass compass,117
+18,object,"A wide view of a library reading room with tall shelves, an open red leather book on a table in the distance",a red leather book,118
+19,object,"A minimalist white bathroom, a small green succulent plant in a ceramic pot on the sink",a succulent in a pot,119
+20,object,"A rainy city street at night with reflections, a yellow umbrella lying open on the sidewalk",a yellow umbrella,120
+21,object,"A kitchen table with plates and cutlery, a single slice of strawberry cake on a small plate",a slice of strawberry cake,121
+22,object,"A sandy beach with footprints, a colorful seashell lying near the waterline",a seashell,122
+23,object,"A cozy bedroom with a bed and nightstand, a vintage alarm clock on the nightstand",a vintage alarm clock,123
+24,object,"A grassy football field seen from the stands, a white soccer ball near the goal post",a soccer ball,124
+25,object,"An office desk with a laptop, papers and pens, a small blue coffee mug with steam rising",a blue coffee mug,125
+26,object,"A forest trail covered in moss, a red mushroom with white spots growing beside a log",a red mushroom with white spots,126
+27,object,"A wooden dock on a calm lake, a classic film camera resting on the edge of the dock",a film camera,127
+28,object,"A snowy front porch with a wooden door, a small wrapped gift box with a red ribbon on the doormat",a gift box with a red ribbon,128
+29,object,"A bright art studio with canvases and easels, a paint palette with colorful paint blobs on a stool",a paint palette,129
+30,person,"A vast desert with towering red rock formations, a lone hiker with a blue backpack walking on the trail",a hiker with a blue backpack,130
+31,person,"A wide snowy mountain landscape, a skier in a red jacket descending the slope in the distance",a skier in a red jacket,131
+32,person,"A large empty city square with pigeons and old buildings, a street musician playing a violin near a fountain",a violinist,132
+33,person,"A misty pier stretching into the ocean, a fisherman in a yellow raincoat at the end of the pier",a fisherman in a yellow raincoat,133
+34,person,"A sunflower field at golden hour, a little girl in a white dress standing among the sunflowers",a girl in a white dress,134
+35,person,"A wide ocean view with big waves, a surfer riding a wave in the middle distance",a surfer,135
+36,person,"A large rooftop garden with plants and city skyline, an old man reading a newspaper on a bench",an old man reading a newspaper,136
+37,person,"A green valley with a winding river, a person paddling a red kayak on the river",a person in a red kayak,137
+38,person,"A quiet train station platform with benches, a woman in a green coat holding a suitcase",a woman in a green coat,138
+39,person,"A wide grassy hill under a cloudy sky, a boy flying a kite at the top of the hill",a boy flying a kite,139
+40,person,"A large kitchen in a restaurant with steel counters, a chef in a white hat plating a dish",a chef in a white hat,140
+41,person,"A frozen lake surrounded by forest, an ice skater in a purple outfit spinning on the ice",an ice skater,141
+42,person,"A busy farmers market street with stalls, a vendor holding a basket of red apples",a vendor holding a basket of apples,142
+43,person,"A rocky cliff face above the sea, a rock climber with a red helmet halfway up the cliff",a rock climber,143
+44,person,"A wide park with autumn trees, a jogger in a bright orange shirt running on the path",a jogger in an orange shirt,144
+45,structure,"A large empty beach at sunset with gentle waves, a small lighthouse on a rocky outcrop in the distance",a lighthouse,145
+46,structure,"A vast green countryside with rolling hills, a small white chapel with a bell tower on a hill",a white chapel,146
+47,structure,"A wide alpine lake surrounded by mountains, a small red wooden cabin on the shore",a red wooden cabin,147
+48,structure,"A misty rice terrace landscape, a small wooden hut with a thatched roof among the terraces",a thatched hut,148
+49,structure,"A wide prairie under a dramatic sky, an old windmill standing alone in the field",an old windmill,149
+50,structure,"A calm harbor with water and hills, a small red sailboat moored near the dock",a red sailboat,150
+51,structure,"A snowy mountain pass, a yellow cable car hanging from a wire in the middle of the image",a yellow cable car,151
+52,structure,"A long country road through autumn trees, a red vintage car parked on the side of the road",a red vintage car,152
+53,structure,"A wide desert highway at dusk, a small neon-lit diner on the side of the road",a neon diner,153
+54,structure,"A dense green jungle canopy seen from above, a small stone temple ruin peeking through the trees",a stone temple ruin,154
+55,structure,"A frozen tundra landscape, a small orange tent pitched near a frozen lake",an orange tent,155
+56,structure,"A wide river with forested banks, a small wooden footbridge crossing the river in the distance",a wooden footbridge,156
+57,structure,"A large green field at dusk, a hot air balloon with rainbow stripes floating low above the field",a hot air balloon,157
+58,structure,"A wide sandy beach, a colorful lifeguard tower standing near the water",a lifeguard tower,158
+59,structure,"A quiet railway through a green valley, a small red steam train crossing a stone viaduct",a red steam train,159

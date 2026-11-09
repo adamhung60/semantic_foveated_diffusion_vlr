@@ -1,0 +1,1 @@
+"""Semantic Foveated Diffusion package."""
