@@ -7,9 +7,10 @@ Running log of ablations on Semantic Foveated Diffusion. Newest experiment at th
 ## Conclusion so far
 
 - **The semantic mask is justified.** At a fixed token budget, placing high-resolution tokens with the focus prompt beats generic, detail, center and random masks on 70–85% of small-object prompts.
-- **The speed claim does not hold against equal-compute baselines.** Ours is 3.6× faster than 28-step full resolution, but full resolution at 8 steps or a 768² image upsampled takes the same 6.3 s and is sharper on about 90% of small-object prompts.
+- **At equal compute, foveation ties few-step full resolution; it does not beat it.** Ours is 3.6× faster than 28-step full resolution, but full resolution at 8 steps takes the same 6.3 s. With `t_switch` 0.85 it is sharper than ours on 93% of small-object prompts; with `t_switch` 0.95 the two are level (experiment 4).
 - **On large subjects quality matches full resolution, latency does not.** The mask covers 58% of the image, so ours takes 9.8 s; full resolution at 8 steps takes 6.5 s at the same score.
-- **The limit looks like Stage 2 strength, not token count.** At `t_switch` 0.85 Stage 2 adds little detail to a 256² draft. Experiment 4 tests this.
+- **`t_switch` 0.85 was too low for small objects.** Raising it to 0.95 lifts focus MUSIQ from 45 to 68 at unchanged latency. At 1.00 the object leaves the mask, so the draft is still needed for layout.
+- **Next:** shorter schedules at `t_switch` 0.95, to see whether foveation plus fewer steps beats fewer steps alone.
 
 ## 1. Fair compute
 
@@ -63,7 +64,20 @@ Draft = the 28-step full-resolution image downsampled to 256², so that image is
 
 ## 4. `t_switch` sweep on the small set
 
-In progress: ours at `t_switch` 0.90, 0.95 and 1.00, reusing the cached drafts and masks.
+Ours on the same 60 drafts and masks, changing only the re-noising level. Latency is 6.3 s at every setting. Baselines at that latency: 768² upsampled 59.9 (6.2 s), full resolution at 8 steps 67.5 (6.5 s).
+
+| `t_switch` | Focus MUSIQ | Beats 768² upsampled | Beats full res, 8 steps | Focus CLIP | Focus LPIPS to own draft |
+|---|---|---|---|---|---|
+| 0.85 | 45.1 | 10% | 7% | 30.2 | 0.31 |
+| 0.90 | 54.1 | 28% | 18% | 30.5 | 0.42 |
+| **0.95** | **67.7** | **70%** | **52%** | 29.9 | 0.65 |
+| 1.00 | 65.0 | 60% | 47% | 26.9 | 0.85 |
+
+- 0.95 beats 0.85 on all 60 prompts. Against 8-step full resolution it is a tie (52% wins, p = 0.8); against 768² upsampled it wins (70%, p = 0.001). 28-step full resolution is still ahead at 71.3.
+- At 1.00 Stage 2 starts from pure noise and the object often lands outside the mask: focus CLIP falls by more than 3 points on 28 of 60 prompts, against 4 of 60 at 0.95.
+- At 0.95 Stage 2 keeps the layout but regenerates the object (LPIPS to the draft 0.65), so the draft fixes where things are, not what they look like. In the paired protocol, focus LPIPS to the reference rises from 0.448 to 0.513.
+
+Summary table: `scripts/summarize_ablations.py` prints it when `results/ablation_small_tswitch.csv` exists.
 
 ## Caveats
 
