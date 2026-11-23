@@ -734,74 +734,88 @@ class Flux2DiTFoveated(torch.nn.Module):
         hidden_states = self.x_embedder(hidden_states)
         encoder_hidden_states = self.context_embedder(encoder_hidden_states)
 
-        # 3. Calculate RoPE embeddings with phase alignment for foveation
-        if img_ids.ndim == 3:
-            img_ids = img_ids[0]
-        if txt_ids.ndim == 3:
-            txt_ids = txt_ids[0]
-
-        # Create HR and LR position IDs
-        # For FLUX2: img_ids has shape [S, 4] with (T, H, W, L) format
-        ids_hr = torch.cat((txt_ids, img_ids), dim=0)
-        
-        # For LR grid, divide H and W coordinates by lr_factor (don't touch T and L)
-        img_ids_lr = img_ids.clone()
-        img_ids_lr[:, 1] = img_ids_lr[:, 1] / float(lr_factor)  # H coordinate
-        img_ids_lr[:, 2] = img_ids_lr[:, 2] / float(lr_factor)  # W coordinate
-        ids_lr = torch.cat((txt_ids, img_ids_lr), dim=0)
-
-        # Compute dual RoPE embeddings
-        rope_cos_hr, rope_sin_hr = self.pos_embed(ids_hr)
-        rope_cos_lr, rope_sin_lr = self.pos_embed(ids_lr)
-
-        # Pack into structure for CRPA Processor
-        if resolution_mask is not None:
-            if resolution_mask.ndim == 2:
-                resolution_mask = resolution_mask[0]
-            # Create text mask (all ones - text is always "high-res")
-            txt_mask = torch.ones(txt_ids.shape[0], device=resolution_mask.device, dtype=resolution_mask.dtype)
-            full_res_mask = torch.cat((txt_mask, resolution_mask), dim=0).bool()
-            full_res_mask_top_left = torch.cat((txt_mask, resolution_mask_top_left), dim=0).bool()
-            image_rotary_emb = ((rope_cos_hr, rope_sin_hr), (rope_cos_lr, rope_sin_lr), full_res_mask, full_res_mask_top_left)
+        # Optional residual cache (TeaCache/FORA-style, used by ablations): on a 'reuse' step the whole
+        # transformer stack is skipped and the residual stored on the last 'store' step (per CFG branch) is
+        # added to the fresh input projection. Disabled unless `_resid_mode` is set.
+        resid_mode = getattr(self, "_resid_mode", None)
+        resid_key = getattr(self, "_resid_key", "posi")
+        if not hasattr(self, "_resid_cache"):
+            self._resid_cache = {}
+        h_in = hidden_states
+        if resid_mode == "reuse" and resid_key in self._resid_cache:
+            hidden_states = h_in + self._resid_cache[resid_key]
         else:
-            # Standard path without foveation
-            image_rotary_emb = ((rope_cos_hr, rope_sin_hr), None, None, None)
-        
-        # For single-stream blocks, use same CRPA structure
-        concat_rotary_emb = image_rotary_emb
+            # 3. Calculate RoPE embeddings with phase alignment for foveation
+            if img_ids.ndim == 3:
+                img_ids = img_ids[0]
+            if txt_ids.ndim == 3:
+                txt_ids = txt_ids[0]
 
-        # 4. Double Stream Transformer Blocks
-        for index_block, block in enumerate(self.transformer_blocks):
-            encoder_hidden_states, hidden_states = gradient_checkpoint_forward(
-                block,
-                use_gradient_checkpointing=use_gradient_checkpointing,
-                use_gradient_checkpointing_offload=use_gradient_checkpointing_offload,
-                hidden_states=hidden_states,
-                encoder_hidden_states=encoder_hidden_states,
-                temb_mod_params_img=double_stream_mod_img,
-                temb_mod_params_txt=double_stream_mod_txt,
-                image_rotary_emb=image_rotary_emb,
-                joint_attention_kwargs=joint_attention_kwargs,
-            )
+            # Create HR and LR position IDs
+            # For FLUX2: img_ids has shape [S, 4] with (T, H, W, L) format
+            ids_hr = torch.cat((txt_ids, img_ids), dim=0)
         
-        # Concatenate text and image streams for single-block inference
-        hidden_states = torch.cat([encoder_hidden_states, hidden_states], dim=1)
+            # For LR grid, divide H and W coordinates by lr_factor (don't touch T and L)
+            img_ids_lr = img_ids.clone()
+            img_ids_lr[:, 1] = img_ids_lr[:, 1] / float(lr_factor)  # H coordinate
+            img_ids_lr[:, 2] = img_ids_lr[:, 2] / float(lr_factor)  # W coordinate
+            ids_lr = torch.cat((txt_ids, img_ids_lr), dim=0)
 
-        # 5. Single Stream Transformer Blocks
-        for index_block, block in enumerate(self.single_transformer_blocks):
-            hidden_states = gradient_checkpoint_forward(
-                block,
-                use_gradient_checkpointing=use_gradient_checkpointing,
-                use_gradient_checkpointing_offload=use_gradient_checkpointing_offload,
-                hidden_states=hidden_states,
-                encoder_hidden_states=None,
-                temb_mod_params=single_stream_mod,
-                image_rotary_emb=concat_rotary_emb,
-                joint_attention_kwargs=joint_attention_kwargs,
-            )
+            # Compute dual RoPE embeddings
+            rope_cos_hr, rope_sin_hr = self.pos_embed(ids_hr)
+            rope_cos_lr, rope_sin_lr = self.pos_embed(ids_lr)
+
+            # Pack into structure for CRPA Processor
+            if resolution_mask is not None:
+                if resolution_mask.ndim == 2:
+                    resolution_mask = resolution_mask[0]
+                # Create text mask (all ones - text is always "high-res")
+                txt_mask = torch.ones(txt_ids.shape[0], device=resolution_mask.device, dtype=resolution_mask.dtype)
+                full_res_mask = torch.cat((txt_mask, resolution_mask), dim=0).bool()
+                full_res_mask_top_left = torch.cat((txt_mask, resolution_mask_top_left), dim=0).bool()
+                image_rotary_emb = ((rope_cos_hr, rope_sin_hr), (rope_cos_lr, rope_sin_lr), full_res_mask, full_res_mask_top_left)
+            else:
+                # Standard path without foveation
+                image_rotary_emb = ((rope_cos_hr, rope_sin_hr), None, None, None)
         
-        # Remove text tokens from concatenated stream
-        hidden_states = hidden_states[:, num_txt_tokens:, ...]
+            # For single-stream blocks, use same CRPA structure
+            concat_rotary_emb = image_rotary_emb
+
+            # 4. Double Stream Transformer Blocks
+            for index_block, block in enumerate(self.transformer_blocks):
+                encoder_hidden_states, hidden_states = gradient_checkpoint_forward(
+                    block,
+                    use_gradient_checkpointing=use_gradient_checkpointing,
+                    use_gradient_checkpointing_offload=use_gradient_checkpointing_offload,
+                    hidden_states=hidden_states,
+                    encoder_hidden_states=encoder_hidden_states,
+                    temb_mod_params_img=double_stream_mod_img,
+                    temb_mod_params_txt=double_stream_mod_txt,
+                    image_rotary_emb=image_rotary_emb,
+                    joint_attention_kwargs=joint_attention_kwargs,
+                )
+        
+            # Concatenate text and image streams for single-block inference
+            hidden_states = torch.cat([encoder_hidden_states, hidden_states], dim=1)
+
+            # 5. Single Stream Transformer Blocks
+            for index_block, block in enumerate(self.single_transformer_blocks):
+                hidden_states = gradient_checkpoint_forward(
+                    block,
+                    use_gradient_checkpointing=use_gradient_checkpointing,
+                    use_gradient_checkpointing_offload=use_gradient_checkpointing_offload,
+                    hidden_states=hidden_states,
+                    encoder_hidden_states=None,
+                    temb_mod_params=single_stream_mod,
+                    image_rotary_emb=concat_rotary_emb,
+                    joint_attention_kwargs=joint_attention_kwargs,
+                )
+        
+            # Remove text tokens from concatenated stream
+            hidden_states = hidden_states[:, num_txt_tokens:, ...]
+
+            if resid_mode == "store":
+                self._resid_cache[resid_key] = hidden_states - h_in
 
         # 6. Output layers
         hidden_states = self.norm_out(hidden_states, temb)
