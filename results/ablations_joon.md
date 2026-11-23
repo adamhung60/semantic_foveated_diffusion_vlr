@@ -7,10 +7,11 @@ Running log of ablations on Semantic Foveated Diffusion. Newest experiment at th
 ## Conclusion so far
 
 - **The semantic mask is justified.** At a fixed token budget, placing high-resolution tokens with the focus prompt beats generic, detail, center and random masks on 70–85% of small-object prompts.
-- **At equal compute, foveation ties few-step full resolution; it does not beat it.** Ours is 3.6× faster than 28-step full resolution, but full resolution at 8 steps takes the same 6.3 s. With `t_switch` 0.85 it is sharper than ours on 93% of small-object prompts; with `t_switch` 0.95 the two are level (experiment 4).
-- **On large subjects quality matches full resolution, latency does not.** The mask covers 58% of the image, so ours takes 9.8 s; full resolution at 8 steps takes 6.5 s at the same score.
-- **`t_switch` 0.85 was too low for small objects.** Raising it to 0.95 lifts focus MUSIQ from 45 to 68 at unchanged latency. At 1.00 the object leaves the mask, so the draft is still needed for layout.
-- **Next:** shorter schedules at `t_switch` 0.95, to see whether foveation plus fewer steps beats fewer steps alone.
+- **With the right settings, foveation is faster at equal focus quality on small objects.** At `t_switch` 0.95 and 6 Stage 2 steps, ours takes 3.8 s and matches 8-step full resolution (6.5 s) in the focus crop. That is 1.7× faster than the best equal-quality baseline and 5.9× faster than 28-step full resolution, which stays about 2 MUSIQ points ahead.
+- **The original settings hid this.** At `t_switch` 0.85 and 14 Stage 2 steps, ours lost to every equal-latency baseline. 0.85 regenerates too little; 1.00 loses the layout; 14 steps is more than Stage 2 needs.
+- **Full resolution cannot simply use fewer steps.** It holds up down to 8 steps and collapses below that, while Stage 2 is unchanged at 6.
+- **No advantage on large subjects so far.** The mask covers 58% of the image, so ours took 9.8 s at 14 Stage 2 steps against 6.5 s for 8-step full resolution. Not yet re-run with 6 steps.
+- **Open:** all scores are on the focus crop. Our periphery is generated at 512²-equivalent resolution and is not scored.
 
 ## 1. Fair compute
 
@@ -79,6 +80,30 @@ Ours on the same 60 drafts and masks, changing only the re-noising level. Latenc
 
 Summary table: `scripts/summarize_ablations.py` prints it when `results/ablation_small_tswitch.csv` exists.
 
+## 5. Stage 2 step sweep at `t_switch` 0.95
+
+Ours with 6, 8 and 10 Stage 2 steps on the same drafts and masks (draft still 14 steps), against few-step baselines of similar latency. Small set, 60 prompts.
+
+| Method | Latency (s) | Focus MUSIQ | Focus CLIP | Ours at similar latency wins |
+|---|---|---|---|---|
+| 512² upsampled, 14 steps | 3.2 | 50.3 | 30.5 | 95% |
+| Full resolution, 4 steps | 3.4 | 41.6 | 25.9 | 82% |
+| 768² upsampled, 8 steps | 3.6 | 60.4 | 30.2 | 77% |
+| **Ours, 6 Stage 2 steps** | **3.8** | **69.1** | 30.1 | – |
+| Full resolution, 5 steps | 4.2 | 53.9 | 28.5 | 75% |
+| Ours, 8 Stage 2 steps | 4.4 | 69.0 | 29.8 | – |
+| Full resolution, 6 steps | 5.0 | 61.8 | 29.3 | 72% |
+| Ours, 10 Stage 2 steps | 5.0 | 67.5 | 29.9 | – |
+| 768² upsampled, 14 steps | 6.2 | 59.9 | 30.6 | 70% |
+| Ours, 14 Stage 2 steps | 6.3 | 67.7 | 29.9 | – |
+| Full resolution, 8 steps | 6.5 | 67.5 | 30.7 | 52% (p = 0.8) |
+| Full resolution, 28 steps | 22.4 | 71.3 | 29.9 | – |
+
+- Cutting Stage 2 from 14 to 6 steps costs nothing in the focus crop (69.1 against 67.7) and brings total latency to 3.8 s.
+- Full resolution degrades fast below 8 steps: 61.8, 53.9 and 41.6 at 6, 5 and 4 steps. At 4 steps the object is often not formed (focus CLIP 25.9).
+- Ours at 3.8 s is level with 8-step full resolution at 6.5 s (wins 45%, p = 0.9). Against 28-step full resolution it wins 40% of prompts (p = 0.24).
+- Under 5 s, ours is the best method tested; every comparison in the last column except the 8-step one is significant at p < 0.01.
+
 ## Caveats
 
 - MUSIQ on ~300 px crops is a proxy; no human ratings. CLIP-IQA is unreliable here (it ranks the bare draft at the top on the large set).
@@ -88,7 +113,7 @@ Summary table: `scripts/summarize_ablations.py` prints it when `results/ablation
 ## Reproduce
 
 ```bash
-# once per phase: encode, base, fov, metrics (then sweep, sweep_metrics for experiment 4)
+# once per phase: encode, base, fov, metrics; then sweep, base_extra, sweep_metrics for experiments 4 and 5
 scripts/run_capped.sh .venv/bin/python scripts/run_ablation_benchmark.py --phase base --prompt_set small
 scripts/run_capped.sh .venv/bin/python scripts/run_ablation_benchmark.py --phase base --prompt_set large --t_switch 0.95
 .venv/bin/python scripts/summarize_ablations.py --csv results/ablation_small_metrics.csv --tag small

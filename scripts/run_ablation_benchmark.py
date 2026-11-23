@@ -7,7 +7,9 @@ LoRA is merged exactly once (run each under scripts/run_capped.sh):
   --phase base     DiT + no_fov LoRA     uniform baselines, draft, masks, all-token refinement, naive
   --phase fov      DiT + fov_random LoRA foveated Stage 2 for every mask source
   --phase metrics  evaluation models     focus-crop metrics for every saved image -> CSV
-  --phase sweep    DiT + fov_random LoRA ours at other t_switch values (--sweep_t), on the cached drafts and masks
+  --phase sweep    DiT + fov_random LoRA ours at other t_switch values and Stage-2 step counts (--sweep_t, --sweep_steps),
+                                         on the cached drafts and masks
+  --phase base_extra  DiT + no_fov LoRA  few-step uniform baselines (--extra_full_steps, --extra_768_steps)
   --phase sweep_metrics                  metrics for the sweep -> results/ablation_{set}_tswitch.csv
 
 Methods
@@ -196,6 +198,39 @@ def phase_base(args, items):
             f"refine_all={latency['refine_all']:.1f}s naive={latency['naive']:.1f}s hr_area={mask.hr_block_ratio:.3f}")
 
 
+def phase_base_extra(args, items):
+    """Few-step uniform baselines that match the latency of the shortened foveated schedules."""
+    pipe = load_generator(args, "no_fov")
+    specs = [(1024, n) for n in args.extra_full_steps] + [(768, n) for n in args.extra_768_steps]
+    name = lambda res, n: f"full_hr_{n}" if res == 1024 else f"uni{res}_{n}"
+
+    def uniform(prompt, seed, cached, res, steps):
+        img, t = pipe.run_single_stage_full_hr(prompt, seed=seed, target_height=res, target_width=res,
+                                               num_steps=steps, cached_prompts=cached, lora_mode="no_fov")
+        return (img if res == 1024 else img.resize((1024, 1024), BICUBIC)), t
+
+    todo = [it for it in items if os.path.exists(os.path.join(prompt_dir(args, it["id"]), "base.json"))]
+    cached = load_cached_prompt(args, todo[0]["id"], args.device, pipe.torch_dtype)
+    for res in sorted({r for r, _ in specs}):
+        uniform(todo[0]["prompt"], 0, cached, res, 2)
+    log("warm-up done")
+    for idx, item in enumerate(todo):
+        out = prompt_dir(args, item["id"])
+        path = os.path.join(out, "extra.json")
+        done = load_json(path) if os.path.exists(path) else {}
+        if all(name(r, n) in done for r, n in specs):
+            continue
+        cached = load_cached_prompt(args, item["id"], args.device, pipe.torch_dtype)
+        for res, n in specs:
+            if name(res, n) in done:
+                continue
+            img, t = uniform(item["prompt"], item["seed"], cached, res, n)
+            img.save(os.path.join(out, f"{name(res, n)}.png"))
+            done[name(res, n)] = {"steps": n, "latency_s": t}
+            save_json(path, done)
+        log(f"[base_extra {idx + 1}/{len(todo)}] id={item['id']} " + " ".join(f"{k}={v['latency_s']:.2f}s" for k, v in done.items()))
+
+
 def load_stage1(out, base):
     from src.semantic_foveation.pipeline import Stage1Output
     low = Image.open(os.path.join(out, "draft_low.png")).convert("RGB")
@@ -210,8 +245,8 @@ def foveated_stage2(pipe, args, prompt, stage1, block_mask, seed, cached, steps,
         stage2_steps=steps, t_switch=t_switch, lora_mode="random", cached_prompts=cached)
 
 
-def t_tag(t_switch):
-    return f"t{round(t_switch * 100):03d}"
+def t_tag(t_switch, steps=14):
+    return f"t{round(t_switch * 100):03d}" + ("" if steps == 14 else f"_s{steps:02d}")
 
 
 def phase_fov(args, items):
@@ -264,7 +299,8 @@ def phase_sweep(args, items):
         out = prompt_dir(args, pid)
         path = os.path.join(out, "sweep.json")
         done = load_json(path) if os.path.exists(path) else {}
-        if all(t_tag(t) in done for t in args.sweep_t):
+        runs = [(t, n) for t in args.sweep_t for n in args.sweep_steps]
+        if all(t_tag(t, n) in done for t, n in runs):
             continue
         base = load_json(os.path.join(out, "base.json"))
         cached = load_cached_prompt(args, pid, args.device, pipe.torch_dtype)
@@ -275,14 +311,16 @@ def phase_sweep(args, items):
         if not warm:
             foveated_stage2(pipe, args, prompt, stage1, mask, 0, cached, 2, args.sweep_t[0])
             warm = True
-        for t in args.sweep_t:
-            if t_tag(t) in done:
+        for t, n in runs:
+            tag = t_tag(t, n)
+            if tag in done:
                 continue
-            img, t2 = foveated_stage2(pipe, args, prompt, stage1, mask, seed, cached, args.stage2_steps, t)
-            img.save(os.path.join(out, f"fov_clipseg_{t_tag(t)}.png"))
-            foveated_stage2(pipe, args, prompt, gt_stage1, gt_mask, seed, cached, args.stage2_steps, t)[0].save(
-                os.path.join(out, f"gt_fov_clipseg_{t_tag(t)}.png"))
-            done[t_tag(t)] = {"t_switch": t, "latency_s": base["stage1_s"] + base["mask_s"] + t2}
+            img, t2 = foveated_stage2(pipe, args, prompt, stage1, mask, seed, cached, n, t)
+            img.save(os.path.join(out, f"fov_clipseg_{tag}.png"))
+            if n == 14:  # the paired protocol is only run at the default step count
+                foveated_stage2(pipe, args, prompt, gt_stage1, gt_mask, seed, cached, n, t)[0].save(
+                    os.path.join(out, f"gt_fov_clipseg_{tag}.png"))
+            done[tag] = {"t_switch": t, "steps": n, "latency_s": base["stage1_s"] + base["mask_s"] + t2}
             save_json(path, done)
         log(f"[sweep {idx + 1}/{len(todo)}] id={pid} " + " ".join(f"{k}={v['latency_s']:.2f}s" for k, v in done.items()))
 
@@ -291,37 +329,49 @@ def phase_sweep_metrics(args, items):
     """One row per (prompt, t_switch, method); the base t_switch images come from the fov phase."""
     import pandas as pd
 
+    from src.semantic_foveation.localizer import CLIPSegLocalizer
     from src.semantic_foveation.metrics import PairedEvaluator, SemanticEvaluator, focus_box_from_heatmap
 
     evaluator = SemanticEvaluator(device=args.device)
     paired = PairedEvaluator(device=args.device)
+    localizer = CLIPSegLocalizer(device=args.device)
     records = []
     for item in items:
         out = prompt_dir(args, item["id"])
         if not os.path.exists(os.path.join(out, "sweep.json")):
             continue
         base, fov, sweep = (load_json(os.path.join(out, f"{n}.json")) for n in ("base", "fov", "sweep"))
-        runs = [(base["t_switch"], "", fov["latency_s"]["fov_clipseg"])] + [(v["t_switch"], f"_{k}", v["latency_s"]) for k, v in sweep.items()]
+        runs = [(base["t_switch"], 14, "", fov["latency_s"]["fov_clipseg"])] + [
+            (v["t_switch"], v.get("steps", 14), f"_{k}", v["latency_s"]) for k, v in sweep.items()]
         box = focus_box_from_heatmap(np.load(os.path.join(out, "masks.npz"))["heatmap_full"].astype(np.float32))
         gt_box = focus_box_from_heatmap(np.load(os.path.join(out, "masks_gt.npz"))["heatmap_full"].astype(np.float32))
         draft = Image.open(os.path.join(out, "lr_draft.png")).convert("RGB")
         reference = Image.open(os.path.join(out, "full_hr_28.png")).convert("RGB")
-        for t, suffix, latency in sorted(runs):
+        for t, steps, suffix, latency in sorted(runs):
             for method, b in (("fov_clipseg", box), ("gt_fov_clipseg", gt_box)):
+                if not os.path.exists(os.path.join(out, f"{method}{suffix}.png")):
+                    continue
                 img = Image.open(os.path.join(out, f"{method}{suffix}.png")).convert("RGB")
-                row = {"id": item["id"], "category": item["category"], "t_switch": t, "method": method,
+                row = {"id": item["id"], "category": item["category"], "t_switch": t, "steps": steps, "method": method,
                        **evaluator.evaluate(img, item["prompt"], item["focus_prompt"], b), "focus_musiq": paired.musiq(img.crop(b))}
                 if method == "fov_clipseg":  # how far Stage 2 moved the image away from its own draft
                     row.update(latency_s=latency, focus_lpips_draft=paired.lpips(img.crop(b), draft.crop(b)), full_lpips_draft=paired.lpips(img, draft))
                 else:
                     row.update(focus_lpips_gt=paired.lpips(img.crop(b), reference.crop(b)), full_lpips_gt=paired.lpips(img, reference))
                 records.append(row)
+        extra_path = os.path.join(out, "extra.json")
+        for method, info in (load_json(extra_path) if os.path.exists(extra_path) else {}).items():
+            img = Image.open(os.path.join(out, f"{method}.png")).convert("RGB")
+            b = focus_box_from_heatmap(localizer.infer_mask(img, item["focus_prompt"]).heatmap_full.cpu().numpy())
+            records.append({"id": item["id"], "category": item["category"], "steps": info["steps"], "method": method,
+                            **evaluator.evaluate(img, item["prompt"], item["focus_prompt"], b),
+                            "focus_musiq": paired.musiq(img.crop(b)), "latency_s": info["latency_s"]})
         print(f"[sweep_metrics] id={item['id']}", flush=True)
 
     df = pd.DataFrame(records)
     csv_path = f"results/ablation_{args.prompt_set}_tswitch.csv"
     df.to_csv(csv_path, index=False)
-    print(df.groupby(["method", "t_switch"]).median(numeric_only=True).drop(columns="id").round(3).to_string())
+    print(df.groupby(["method", "t_switch", "steps"], dropna=False).median(numeric_only=True).drop(columns="id").round(3).to_string())
     log(f"wrote {csv_path}")
 
 
@@ -391,7 +441,7 @@ def phase_metrics(args, items):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--phase", required=True, choices=["encode", "base", "fov", "metrics", "sweep", "sweep_metrics"])
+    parser.add_argument("--phase", required=True, choices=["encode", "base", "fov", "metrics", "sweep", "sweep_metrics", "base_extra"])
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--output_dir", type=str, default="outputs/ablation")
     parser.add_argument("--prompt_set", type=str, default="small", choices=list(PROMPT_SETS))
@@ -402,6 +452,9 @@ def main():
     parser.add_argument("--stage2_steps", type=int, default=14)
     parser.add_argument("--t_switch", type=float, default=0.85)
     parser.add_argument("--sweep_t", type=float, nargs="+", default=[0.90, 0.95, 1.00], help="Re-noising levels for --phase sweep")
+    parser.add_argument("--sweep_steps", type=int, nargs="+", default=[14], help="Stage-2 step counts for --phase sweep")
+    parser.add_argument("--extra_full_steps", type=int, nargs="+", default=[6, 5, 4], help="1024^2 step counts for --phase base_extra")
+    parser.add_argument("--extra_768_steps", type=int, nargs="+", default=[8], help="768^2 step counts for --phase base_extra")
     parser.add_argument("--mask_threshold", type=float, default=0.5)
     parser.add_argument("--dilation_blocks", type=int, default=2)
     parser.add_argument("--vram_fraction", type=float, default=0.9, help="Hard cap on this process's share of GPU memory")
@@ -414,7 +467,7 @@ def main():
     items = PROMPT_SETS[args.prompt_set][: args.num_prompts]
     with torch.no_grad():
         {"encode": phase_encode, "base": phase_base, "fov": phase_fov, "metrics": phase_metrics,
-         "sweep": phase_sweep, "sweep_metrics": phase_sweep_metrics}[args.phase](args, items)
+         "sweep": phase_sweep, "sweep_metrics": phase_sweep_metrics, "base_extra": phase_base_extra}[args.phase](args, items)
 
 
 if __name__ == "__main__":

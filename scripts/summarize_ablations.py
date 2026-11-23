@@ -36,9 +36,34 @@ def paired(df, a, b, col, higher_is_better=True):
     return f"{(diff > 0).mean():.0%} (p={p:.1g})"
 
 
+def steps_table(sw, df):
+    """Shortened foveated schedules against few-step uniform baselines of similar latency."""
+    ours = sw[(sw.method == "fov_clipseg") & (sw.steps != 14)]
+    if ours.empty:
+        return
+    t = ours.t_switch.iloc[0]
+    rows = pd.concat([
+        sw[(sw.method == "fov_clipseg") & (sw.t_switch == t)].assign(method=lambda d: "ours_s" + d.steps.astype(int).astype(str)),
+        sw[sw.t_switch.isna()], df[df.method.isin(["full_hr_8", "uni768_14", "uni512_14"])]])
+    med = rows.groupby("method")[["latency_s", "focus_musiq", "focus_hf", "focus_clip"]].median().sort_values("latency_s")
+    wide = rows.pivot(index="id", columns="method", values="focus_musiq")
+    baselines = [m for m in med.index if not m.startswith("ours")]
+    med["ours of similar latency wins"] = "-"
+    for b in baselines:  # compare each baseline with the foveated schedule closest to it in latency
+        o = min((m for m in med.index if m.startswith("ours")), key=lambda m: abs(med.loc[m, "latency_s"] - med.loc[b, "latency_s"]))
+        d = (wide[o] - wide[b]).dropna()
+        med.loc[b, "ours of similar latency wins"] = f"{o}: {(d > 0).mean():.0%} (p={wilcoxon(d).pvalue:.1g})"
+    print(f"\n== 5. Step sweep at t_switch {t} ({wide.shape[0]} prompts, medians) ==")
+    print(med.round(2).to_string())
+
+
 def tswitch_table(df, csv_path):
     """Ours at each re-noising level, against the equal-latency baselines of the main benchmark."""
     sw = pd.read_csv(csv_path)
+    if "steps" not in sw:
+        sw["steps"] = 14
+    steps_table(sw, df)
+    sw = sw[sw.steps == 14]
     ours = sw[sw.method == "fov_clipseg"]
     wide = ours.pivot(index="id", columns="t_switch", values="focus_musiq")
     base = df.pivot(index="id", columns="method", values="focus_musiq")
