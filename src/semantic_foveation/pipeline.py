@@ -110,35 +110,49 @@ class SemanticFoveatedPipeline:
         torch_dtype: torch.dtype = torch.bfloat16,
         offload_text_encoder: bool = True,
         low_vram: bool = False,
+        components: Tuple[str, ...] = ("transformer", "text_encoder", "vae"),
+        load_localizer: bool = True,
     ):
+        """`components` selects which FLUX.2 weights to load. On a machine with little RAM, load the
+        text encoder and the DiT in separate processes (encode prompts first, cache them, then generate)."""
         self.device = device
         self.low_vram = low_vram
         self.torch_dtype = torch_dtype
         self.model_id = model_id
         self.offload_text_encoder = offload_text_encoder
 
-        print(f"[SemanticFoveatedPipeline] Loading FLUX.2 Foveated Pipeline on {device}...")
+        print(f"[SemanticFoveatedPipeline] Loading FLUX.2 Foveated Pipeline {components} on {device}...")
+        file_patterns = {
+            "transformer": "transformer/*.safetensors",
+            "text_encoder": "text_encoder/*.safetensors",
+            "vae": "vae/diffusion_pytorch_model.safetensors",
+        }
         self.pipe = Flux2FoveatedImagePipeline.from_pretrained(
             torch_dtype=torch_dtype,
             device="cpu",
             model_configs=[
-                ModelConfig(model_id=model_id, origin_file_pattern="transformer/*.safetensors"),
-                ModelConfig(model_id=model_id, origin_file_pattern="text_encoder/*.safetensors"),
-                ModelConfig(model_id=model_id, origin_file_pattern="vae/diffusion_pytorch_model.safetensors"),
+                ModelConfig(model_id=model_id, origin_file_pattern=file_patterns[name])
+                for name in ("transformer", "text_encoder", "vae") if name in components
             ],
             tokenizer_config=ModelConfig(model_id=model_id, origin_file_pattern="tokenizer/"),
         )
         self.pipe.device = device
-        self.pipe.dit.to(device)
-        self.pipe.vae.to(device)
+        if self.pipe.dit is not None:
+            self.pipe.dit.to(device)
+        if self.pipe.vae is not None:
+            self.pipe.vae.to(device)
 
-        print(f"[SemanticFoveatedPipeline] Loading CLIPSeg localizer ({clipseg_model_id}) on {device}...")
-        self.localizer = CLIPSegLocalizer(model_id=clipseg_model_id, device=device)
+        self.localizer = None
+        if load_localizer:
+            print(f"[SemanticFoveatedPipeline] Loading CLIPSeg localizer ({clipseg_model_id}) on {device}...")
+            self.localizer = CLIPSegLocalizer(model_id=clipseg_model_id, device=device)
 
         # Cache of precomputed LoRA weight deltas {mode: {layer_name: delta_tensor_cpu}}
         self._lora_deltas: Dict[str, Dict[str, torch.Tensor]] = {}
         self._active_lora_mode: Optional[str] = None
-        self._dit_modules: Dict[str, torch.nn.Module] = dict(self.pipe.dit.named_modules())
+        self._dit_modules: Dict[str, torch.nn.Module] = (
+            dict(self.pipe.dit.named_modules()) if self.pipe.dit is not None else {}
+        )
 
     def _preload_lora_deltas(self, lora_mode: str) -> Dict[str, torch.Tensor]:
         """Load and precompute (B @ A) weight deltas for fast (<5ms) LoRA switching."""

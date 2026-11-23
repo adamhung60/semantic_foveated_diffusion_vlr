@@ -5,6 +5,10 @@ All focus metrics are computed on a square crop around the focus object (`focus_
   - focus_clip_iqa: CLIP-IQA style P("sharp photo" | crop) vs. "blurry photo" (perceived detail)
   - focus_hf:       mean squared Laplacian of the crop (high-frequency energy)
   - full_clip:      CLIP similarity between the full image and the scene prompt
+
+`PairedEvaluator` adds two metrics that do not depend on hand-written CLIP prompts or raw pixel statistics:
+  - musiq: no-reference learned image quality (MUSIQ), usable on any image
+  - lpips: perceptual distance to a reference image with the same composition (lower is closer)
 """
 
 from typing import Dict, Tuple
@@ -74,3 +78,27 @@ class SemanticEvaluator:
             "focus_clip_iqa": self.clip_iqa(crop),
             "focus_hf": high_freq_energy(crop),
         }
+
+
+class PairedEvaluator:
+    """MUSIQ (no-reference) and LPIPS (against a same-composition reference)."""
+
+    def __init__(self, device: str = "cuda:0"):
+        import lpips
+        import pyiqa
+
+        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
+        self._lpips = lpips.LPIPS(net="alex", verbose=False).to(self.device).eval()
+        self._musiq = pyiqa.create_metric("musiq", device=self.device)
+
+    def _tensor(self, image: Image.Image) -> torch.Tensor:
+        arr = np.asarray(image.convert("RGB"), dtype=np.float32) / 255.0
+        return torch.from_numpy(arr).permute(2, 0, 1).unsqueeze(0).to(self.device)
+
+    @torch.no_grad()
+    def musiq(self, image: Image.Image) -> float:
+        return float(self._musiq(self._tensor(image)).item())
+
+    @torch.no_grad()
+    def lpips(self, image: Image.Image, reference: Image.Image) -> float:
+        return float(self._lpips(self._tensor(image) * 2 - 1, self._tensor(reference) * 2 - 1).item())

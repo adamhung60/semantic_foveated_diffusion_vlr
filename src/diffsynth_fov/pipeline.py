@@ -204,19 +204,23 @@ class Flux2FoveatedImagePipeline(BasePipeline):
               f"num_single_layers={num_single_layers}, num_attention_heads={num_attention_heads}, "
               f"attention_head_dim={attention_head_dim}, guidance_embeds={guidance_embeds}")
         
-        # Create foveated model with inferred parameters
-        foveated_dit = Flux2DiTFoveated(
-            in_channels=in_channels,
-            num_layers=num_layers,
-            num_single_layers=num_single_layers,
-            attention_head_dim=attention_head_dim,
-            num_attention_heads=num_attention_heads,
-            joint_attention_dim=joint_attention_dim,
-            guidance_embeds=guidance_embeds,
-        )
-        
+        # Create foveated model with inferred parameters. Build it without allocating weights and then
+        # adopt the base model's tensors: a normal constructor would allocate a second, float32 copy of
+        # every parameter (~16 GB of RAM for the 4B model) before the weights are copied in.
+        from accelerate import init_empty_weights
+        with init_empty_weights():
+            foveated_dit = Flux2DiTFoveated(
+                in_channels=in_channels,
+                num_layers=num_layers,
+                num_single_layers=num_single_layers,
+                attention_head_dim=attention_head_dim,
+                num_attention_heads=num_attention_heads,
+                joint_attention_dim=joint_attention_dim,
+                guidance_embeds=guidance_embeds,
+            )
+
         # Load state dict directly - architectures are identical
-        foveated_dit.load_state_dict(state_dict)
+        foveated_dit.load_state_dict(state_dict, assign=True)
         
         # Move to same device and dtype as base model
         device = next(base_dit.parameters()).device
