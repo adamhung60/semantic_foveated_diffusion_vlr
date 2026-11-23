@@ -55,6 +55,18 @@ def image_draft(image_low):
     return Stage1Output(image_low, image_low.resize((1024, 1024), BICUBIC), torch.zeros(1, 0, 128), 0.0)
 
 
+def periphery_crop(img, box, size=512):
+    """The image-corner crop farthest from the focus box: a region foveation leaves at low resolution."""
+    cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+    corners = [(x, y) for x in (0, img.width - size) for y in (0, img.height - size)]
+    x, y = max(corners, key=lambda c: (c[0] + size / 2 - cx) ** 2 + (c[1] + size / 2 - cy) ** 2)
+    return img.crop((x, y, x + size, y + size))
+
+
+def whole_image_scores(paired, img, box):
+    return {"full_musiq": paired.musiq(img), "periph_musiq": paired.musiq(periphery_crop(img, box))}
+
+
 def log(msg):
     rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6
     vram = torch.cuda.max_memory_allocated() / 1e9 if torch.cuda.is_available() else 0.0
@@ -353,7 +365,8 @@ def phase_sweep_metrics(args, items):
                     continue
                 img = Image.open(os.path.join(out, f"{method}{suffix}.png")).convert("RGB")
                 row = {"id": item["id"], "category": item["category"], "t_switch": t, "steps": steps, "method": method,
-                       **evaluator.evaluate(img, item["prompt"], item["focus_prompt"], b), "focus_musiq": paired.musiq(img.crop(b))}
+                       **evaluator.evaluate(img, item["prompt"], item["focus_prompt"], b), "focus_musiq": paired.musiq(img.crop(b)),
+                       **whole_image_scores(paired, img, b)}
                 if method == "fov_clipseg":  # how far Stage 2 moved the image away from its own draft
                     row.update(latency_s=latency, focus_lpips_draft=paired.lpips(img.crop(b), draft.crop(b)), full_lpips_draft=paired.lpips(img, draft))
                 else:
@@ -365,7 +378,8 @@ def phase_sweep_metrics(args, items):
             b = focus_box_from_heatmap(localizer.infer_mask(img, item["focus_prompt"]).heatmap_full.cpu().numpy())
             records.append({"id": item["id"], "category": item["category"], "steps": info["steps"], "method": method,
                             **evaluator.evaluate(img, item["prompt"], item["focus_prompt"], b),
-                            "focus_musiq": paired.musiq(img.crop(b)), "latency_s": info["latency_s"]})
+                            "focus_musiq": paired.musiq(img.crop(b)), **whole_image_scores(paired, img, b),
+                            "latency_s": info["latency_s"]})
         print(f"[sweep_metrics] id={item['id']}", flush=True)
 
     df = pd.DataFrame(records)
@@ -400,7 +414,7 @@ def phase_metrics(args, items):
         def common(method, img, box):
             return {"id": item["id"], "category": item["category"], "method": method, "box": json.dumps([int(v) for v in box]),
                     "box_side": int(box[2] - box[0]), **evaluator.evaluate(img, item["prompt"], item["focus_prompt"], box),
-                    "focus_musiq": paired.musiq(img.crop(box))}
+                    "focus_musiq": paired.musiq(img.crop(box)), **whole_image_scores(paired, img, box)}
 
         for method in latency:
             img = Image.open(os.path.join(out, f"{method}.png")).convert("RGB")

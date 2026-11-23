@@ -44,8 +44,9 @@ def steps_table(sw, df):
     t = ours.t_switch.iloc[0]
     rows = pd.concat([
         sw[(sw.method == "fov_clipseg") & (sw.t_switch == t)].assign(method=lambda d: "ours_s" + d.steps.astype(int).astype(str)),
-        sw[sw.t_switch.isna()], df[df.method.isin(["full_hr_8", "uni768_14", "uni512_14"])]])
-    med = rows.groupby("method")[["latency_s", "focus_musiq", "focus_hf", "focus_clip"]].median().sort_values("latency_s")
+        sw[sw.t_switch.isna()], df[df.method.isin(["full_hr_28", "full_hr_8", "uni768_14", "uni512_14", "lr_draft"])]])
+    cols = ["latency_s", "focus_musiq", "focus_hf", "focus_clip"] + [c for c in ("full_musiq", "periph_musiq") if c in rows]
+    med = rows.groupby("method")[cols].median().sort_values("latency_s")
     wide = rows.pivot(index="id", columns="method", values="focus_musiq")
     baselines = [m for m in med.index if not m.startswith("ours")]
     med["ours of similar latency wins"] = "-"
@@ -101,7 +102,8 @@ def main():
     full = med.loc["full_hr_28", "latency_s"]
 
     print(f"\n== 1. Fair-compute comparison ({n} prompts, medians) ==")
-    t1 = med.loc[[m for _, _, pts, _ in FAMILIES for m, _ in pts], ["latency_s"] + QUALITY].copy()
+    whole = [c for c in ("full_musiq", "periph_musiq") if c in med]
+    t1 = med.loc[[m for _, _, pts, _ in FAMILIES for m, _ in pts], ["latency_s"] + QUALITY + whole].copy()
     t1.insert(1, "speedup", full / t1.latency_s)
     t1["ours wins on MUSIQ"] = [paired(df, "fov_clipseg", m, "focus_musiq") if m != "fov_clipseg" else "-" for m in t1.index]
     print(t1.round(2).to_string())

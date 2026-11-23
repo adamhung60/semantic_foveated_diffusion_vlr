@@ -6,12 +6,12 @@ Running log of ablations on Semantic Foveated Diffusion. Newest experiment at th
 
 ## Conclusion so far
 
-- **The semantic mask is justified.** At a fixed token budget, placing high-resolution tokens with the focus prompt beats generic, detail, center and random masks on 70–85% of small-object prompts.
-- **With the right settings, foveation is faster at equal focus quality on small objects.** At `t_switch` 0.95 and 6 Stage 2 steps, ours takes 3.8 s and matches 8-step full resolution (6.5 s) in the focus crop. That is 1.7× faster than the best equal-quality baseline and 5.9× faster than 28-step full resolution, which stays about 2 MUSIQ points ahead.
-- **The original settings hid this.** At `t_switch` 0.85 and 14 Stage 2 steps, ours lost to every equal-latency baseline. 0.85 regenerates too little; 1.00 loses the layout; 14 steps is more than Stage 2 needs.
-- **Full resolution cannot simply use fewer steps.** It holds up down to 8 steps and collapses below that, while Stage 2 is unchanged at 6.
-- **No advantage on large subjects so far.** The mask covers 58% of the image, so ours took 9.8 s at 14 Stage 2 steps against 6.5 s for 8-step full resolution. Not yet re-run with 6 steps.
-- **Open:** all scores are on the focus crop. Our periphery is generated at 512²-equivalent resolution and is not scored.
+- **Mask:** at equal tokens, focus-prompt placement beats text-free masks on 70–85% of small-object prompts.
+- **Settings:** use `t_switch` 0.95 and 6 Stage 2 steps. 0.85 regenerates too little, 1.00 loses the layout, and steps beyond 6 add nothing.
+- **Speed, small objects:** 3.8 s for the focus quality of 8-step full resolution (6.5 s). 5.9× faster than 28 steps, which stays about 2 MUSIQ points ahead.
+- **The gain is in the focus region only.** Our periphery scores 52 against 64 for 8-step full resolution, and whole-image quality equals 768² at 8 steps (3.6 s). Foveation moves quality to the focus; it does not add any overall.
+- **Baselines:** full resolution collapses below 8 steps on small objects, so it cannot match our focus quality by cutting steps. On large subjects it holds up down to 4–5 steps.
+- **Large subjects:** no advantage. Ours with 6 steps takes 5.3 s; 768² at 8 steps reaches the same quality in 3.6 s.
 
 ## 1. Fair compute
 
@@ -104,9 +104,41 @@ Ours with 6, 8 and 10 Stage 2 steps on the same drafts and masks (draft still 14
 - Ours at 3.8 s is level with 8-step full resolution at 6.5 s (wins 45%, p = 0.9). Against 28-step full resolution it wins 40% of prompts (p = 0.24).
 - Under 5 s, ours is the best method tested; every comparison in the last column except the 8-step one is significant at p < 0.01.
 
+## 6. Whole-image quality, and large subjects with shorter Stage 2
+
+Ours at `t_switch` 0.95. Whole image = MUSIQ on the full 1024² output. Periphery = MUSIQ on the 512² corner crop farthest from the focus box.
+
+Small objects, 60 prompts:
+
+| Method | Latency (s) | Focus | Whole image | Periphery |
+|---|---|---|---|---|
+| 512² upsampled, 14 steps | 3.2 | 50.3 | 62.4 | 54.8 |
+| 768² upsampled, 8 steps | 3.6 | 60.4 | 68.3 | 58.4 |
+| **Ours, 6 Stage 2 steps** | **3.8** | **69.1** | 67.8 | 52.2 |
+| Full resolution, 6 steps | 5.0 | 61.8 | 68.2 | 59.3 |
+| Full resolution, 8 steps | 6.5 | 67.5 | 70.8 | 63.7 |
+| Full resolution, 28 steps | 22.4 | 71.3 | 72.6 | 66.9 |
+
+Large subjects, 12 prompts:
+
+| Method | Latency (s) | Focus | Whole image | Periphery |
+|---|---|---|---|---|
+| Full resolution, 4 steps | 3.4 | 71.0 | 73.2 | 64.6 |
+| 768² upsampled, 8 steps | 3.6 | 74.3 | 74.1 | 70.5 |
+| Full resolution, 6 steps | 5.0 | 75.2 | 75.5 | 69.2 |
+| **Ours, 6 Stage 2 steps** | 5.3 | 75.6 | 75.4 | 66.6 |
+| Full resolution, 8 steps | 6.5 | 76.2 | 75.9 | 71.6 |
+| Ours, 14 Stage 2 steps | 9.8 | 74.2 | 74.2 | 65.3 |
+| Full resolution, 28 steps | 22.4 | 75.3 | 75.4 | 73.8 |
+
+- Small objects: ours has the best focus score under 6 s and the lowest periphery score of the sharp methods, about level with uniform 512². On the whole image it ties 768² at 8 steps (wins 40%, p = 0.1) and loses to 8-step full resolution (wins 27%, p < 0.001).
+- Large subjects: 6 Stage 2 steps are again enough (75.6 against 74.2 at 14 steps) and cut latency from 9.8 to 5.3 s, but every method from 3.6 s up scores 74–76, so there is nothing left for foveation to win.
+- Few-step full resolution fails on small objects (41.6 at 4 steps) but not on large subjects (71.0 at 4 steps). Small objects are the case that needs more steps at full resolution, and the case where foveation pays off.
+- On the large set the focus box is usually the whole image, so "periphery" there overlaps the subject.
+
 ## Caveats
 
-- MUSIQ on ~300 px crops is a proxy; no human ratings. CLIP-IQA is unreliable here (it ranks the bare draft at the top on the large set).
+- MUSIQ is a proxy; no human ratings. Focus crops are ~300 px wide on the small set. CLIP-IQA is unreliable here (it ranks the bare draft at the top on the large set).
 - One seed per prompt; one timed run per image. The large set has only 12 prompts.
 - The two sets differ in both subject size and `t_switch`.
 
@@ -119,4 +151,4 @@ scripts/run_capped.sh .venv/bin/python scripts/run_ablation_benchmark.py --phase
 .venv/bin/python scripts/summarize_ablations.py --csv results/ablation_small_metrics.csv --tag small
 ```
 
-Per-prompt rows: `results/ablation_{small,large}_metrics.csv`, `results/ablation_small_tswitch.csv`.
+Per-prompt rows: `results/ablation_{small,large}_metrics.csv` (experiments 1–3), `results/ablation_{small,large}_tswitch.csv` (experiments 4–6).
