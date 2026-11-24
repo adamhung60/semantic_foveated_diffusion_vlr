@@ -2,14 +2,14 @@
 
 Running log of ablations on Semantic Foveated Diffusion. Newest experiment at the bottom.
 
-**Setup.** FLUX.2-klein-base-4B, 1024² output, one seed per prompt, RTX 5080. Small-object set: 60 prompts, `t_switch` 0.85. Large-subject set: 12 prompts, `t_switch` 0.95.
+**Setup.** FLUX.2-klein-base-4B, 1024² output, one seed per prompt, RTX 5080. Small-object set: 60 prompts, `t_switch` 0.85. Large-subject set: 12 prompts, `t_switch` 0.95. Quality is median MUSIQ on the focus crop (higher is sharper). "Ours wins" is the share of prompts where our focus crop scores higher.
 
 | Prompt set | Prompts | Kind of prompt | Object area (median) | High-resolution mask (median) | Stage 2 tokens (median) |
 |---|---|---|---|---|---|
 | Small objects | 60 | Wide scene with one small object | 3.6% of the image | 10.5% | 1,347 of 4,096 |
 | Large subjects | 12 | Close-up, subject fills the frame | 36.7% | 57.8% | 2,799 of 4,096 |
 
-Object area is the thresholded CLIPSeg region; the mask is that region dilated by two blocks. The sets are defined by how the prompts are written, not by a size threshold: 5 of the 60 small-object prompts have a mask above 25%. There are no prompts between the two regimes. Quality is median MUSIQ on the focus crop (higher is sharper). "Ours wins" is the share of prompts where our focus crop scores higher.
+Object area is the thresholded CLIPSeg region; the mask is that region dilated by two blocks. The sets are defined by how the prompts are written, not by a size threshold: 5 of the 60 small-object prompts have a mask above 25%. There are no prompts between the two regimes.
 
 ## Conclusion so far
 
