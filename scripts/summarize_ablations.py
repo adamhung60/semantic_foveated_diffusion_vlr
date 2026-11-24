@@ -1,7 +1,7 @@
 """Summarize results/ablations/metrics.csv into markdown tables (+ latency/quality plot).
 
 Every comparison is paired over the prompts both variants share, with 95% bootstrap CIs (2000 resamples).
-Writes results/ablations/SUMMARY.md and assets/ablation_latency_quality.png, and splices SUMMARY.md into
+Writes results/ablations/SUMMARY.md, the figures (scripts/ablation_figure.py), and splices SUMMARY.md into
 RESULTS.md between the ABLATIONS markers.
 """
 
@@ -18,7 +18,6 @@ import pandas as pd
 
 CSV = "results/ablations/metrics.csv"
 OUT = "results/ablations/SUMMARY.md"
-PLOT = "assets/ablation_latency_quality.png"
 METRICS = ["latency_s", "tokens", "obj_topiq", "obj_musiq", "obj_clipiqa", "obj_hf", "obj_clip", "owl_score", "pick",
            "drift_lpips", "ref_lpips_obj", "seam"]
 rng = np.random.default_rng(0)
@@ -91,29 +90,6 @@ def paired_table(df, pairs, metrics, title, note=""):
     return ("\n".join(lines) + "\n") if any_row else ""
 
 
-def plot(df):
-    g = df.groupby("variant").agg(lat=("latency_s", "median"), q=("obj_topiq", "mean"), p=("pick", "mean"))
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
-    fams = [("Full HR (steps)", lambda v: v.startswith("fhr") and "_" not in v, "#444444", "o-"),
-            ("Ours t0.95, refine steps", lambda v: v in ("ours_t95_r5", "ours_t95_r7", "ours_t95_r10", "ours_t95_r14"), "#d62728", "s-"),
-            ("Full HR + speedups", lambda v: v.startswith("fhr") and "_" in v, "#7f7f7f", "x"),
-            ("Ours + speedups / variants", lambda v: v.startswith("ours") and v not in ("ours_t95_r5", "ours_t95_r7", "ours_t95_r10", "ours_t95_r14"), "#ff7f0e", "^"),
-            ("Draft only", lambda v: v.startswith("draft"), "#2ca02c", "D")]
-    for ax, col, lab in [(axes[0], "q", "object TOPIQ ↑"), (axes[1], "p", "PickScore ↑")]:
-        for name, f, c, mk in fams:
-            s = g[[f(v) for v in g.index]].sort_values("lat")
-            if len(s):
-                ax.plot(s.lat, s[col], mk, color=c, label=name, ms=6)
-                for v, r in s.iterrows():
-                    ax.annotate(v.replace("ours_", "").replace("_t95", ""), (r.lat, r[col]), fontsize=6, xytext=(3, 3), textcoords="offset points")
-        ax.set_xlabel("median end-to-end latency on Tesla T4 (s)")
-        ax.set_ylabel(lab)
-        ax.grid(alpha=0.3)
-    axes[0].legend(fontsize=7)
-    fig.tight_layout()
-    fig.savefig(PLOT, dpi=130)
-
-
 def main():
     if not os.path.exists(CSV):
         print("no metrics yet")
@@ -179,7 +155,6 @@ def main():
     md = "\n".join(p for p in parts if p)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     open(OUT, "w").write(md)
-    plot(df)
     try:
         import ablation_figure
         ablation_figure.main()

@@ -2,7 +2,9 @@
 
 This document lists every ablation run in the Session 2 study and what each one showed. The full tables, with every paired confidence interval, are in [RESULTS.md](RESULTS.md) (section "Session 2") and [results/ablations/SUMMARY.md](results/ablations/SUMMARY.md). The raw per-image metrics are in `results/ablations/metrics*.csv`.
 
-![latency vs quality](assets/ablation_latency_quality.png)
+![Latency vs. quality: Full HR step sweep vs. ours](assets/ablation_latency_quality.png)
+
+*Each point is one configuration, averaged over the same 30 prompts; numbers next to points are denoising steps. Ours (blue) reaches the object quality of Full HR at 10–28 steps (orange) in 16–29 s. On whole-image PickScore, Full HR catches up only at 14+ steps, because ours keeps the background at low resolution.*
 
 ## Setup
 
@@ -31,6 +33,10 @@ This document lists every ablation run in the Session 2 study and what each one 
 - **The gain comes from the mask's placement.** A CLIPSeg mask beats a same-size mask in the wrong place by +0.15 object TOPIQ. A wrong-place mask is no better than no full-res tokens at all.
 - **The all-full-res gap is explained.** Making every token full-res gives a worse object because it keeps the blur of the bicubic-upsampled draft. The LoRA and the schedule shift are ruled out as causes.
 - **Caveat:** no-reference IQA rewards sharpening. The draft plus Real-ESRGAN, with no diffusion at all, already scores TOPIQ 0.525. A blind human A/B test is still needed before claiming a perceptual win.
+
+![Paired effect of every ablation on object quality](assets/ablation_effects.png)
+
+*Each row is a paired comparison over the same prompts and draft (first − second), with a 95% bootstrap CI. Filled points have CIs that exclude 0; hollow points are not significant. "Seed 2" rows rerun the comparison with a different noise seed.*
 
 ## All ablations
 
@@ -161,7 +167,11 @@ $PY scripts/summarize_ablations.py            # tables -> results/ablations/SUMM
 | [scripts/run_ablations.py](scripts/run_ablations.py) | Variant registry and generation |
 | [scripts/eval_ablations.py](scripts/eval_ablations.py) | Metrics |
 | [scripts/summarize_ablations.py](scripts/summarize_ablations.py) | Paired-bootstrap tables and plot |
-| [scripts/ablation_figure.py](scripts/ablation_figure.py) | Qualitative grid (`assets/ablation_qualitative.png`) |
+| [scripts/ablation_figure.py](scripts/ablation_figure.py) | Figures: latency vs. quality, paired-effects plot, qualitative grid |
 | [scripts/run_all.sh](scripts/run_all.sh), [scripts/extra_phases.sh](scripts/extra_phases.sh) | Phase driver |
 
-![qualitative](assets/ablation_qualitative.png)
+## Qualitative examples
+
+![Qualitative comparison](assets/ablation_qualitative.jpg)
+
+*Three prompts at the 25th, 50th and 75th percentile of the ours-vs-all-full-res TOPIQ gap, chosen by that rule rather than by eye. Top of each pair: the full image with the OWLv2 object box. Bottom: the crop that box defines, which is what TOPIQ scores. All columns except Full HR share the same draft. Note that TOPIQ can differ a lot between near-identical crops (gift box: 0.71 vs. 0.41), which is why the claims rest on paired averages over many prompts rather than on single images.*
